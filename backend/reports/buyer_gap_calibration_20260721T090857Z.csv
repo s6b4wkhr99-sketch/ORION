@@ -1,0 +1,11 @@
+sku,raw_buyer_pct,raw_prospect_pct,raw_gap_points,reweighted_buyer_pct,reweighted_gap_points,bias_effect_pp,suggested_action
+V4,47.97,15.08,32.89,45.28,30.2,-2.69,Increase value/mid-tier recommendation (buyer profile exceeds prospect mix)
+M4,2.74,31.81,-29.07,2.79,-29.02,0.05,Reduce prospect recommendation share (over-index vs debiased buyer profile)
+V9,2.28,22.33,-20.05,2.36,-19.97,0.08,Reduce prospect recommendation share (over-index vs debiased buyer profile)
+V6,23.05,7.45,15.6,21.2,13.75,-1.85,Increase value/mid-tier recommendation (buyer profile exceeds prospect mix)
+M6,9.21,0.0,9.21,11.56,11.56,2.35,Increase value/mid-tier recommendation (buyer profile exceeds prospect mix)
+M6S,0.0,9.18,-9.18,0.0,-9.18,0.0,Reduce prospect recommendation share (over-index vs debiased buyer profile)
+V7,3.79,12.96,-9.17,4.66,-8.3,0.87,Reduce prospect recommendation share (over-index vs debiased buyer profile)
+V5,3.96,0.98,2.98,6.25,5.27,2.29,Increase value/mid-tier recommendation (buyer profile exceeds prospect mix)
+M2,6.45,0.0,6.45,4.99,4.99,-1.46,Monitor — gap within tolerance
+M10,0.55,0.0,0.55,0.92,0.92,0.37,Monitor — gap within tolerance

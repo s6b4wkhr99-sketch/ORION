@@ -1,0 +1,26 @@
+# Local PostgreSQL for Phase 3 development (host-accessible)
+# Usage:
+#   docker compose -f docker-compose.postgres.yml up -d
+#   export DATABASE_URL=postgresql+psycopg2://cios:cios_dev_password@127.0.0.1:5432/cios
+#   export UPLOAD_ASYNC=true
+#   cd backend && alembic upgrade head
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: cios
+      POSTGRES_PASSWORD: cios_dev_password
+      POSTGRES_DB: cios
+    volumes:
+      - cios_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cios"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  cios_postgres_data:

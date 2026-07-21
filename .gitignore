@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+backend/.env.postgres
+*.db
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
+
+# Uploads & runtime artifacts
+backend/uploads/
+backend/backups/
+backend/archive/
+backend/reports/
+*.log
+.dev/
