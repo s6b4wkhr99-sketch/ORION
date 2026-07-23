@@ -89,19 +89,32 @@ CIOS/
 
 ---
 
-## 5. Quick Start
+## 5. Quick Start (Local Native)
+
+**Full guide:** [Local Operations Quickstart](./docs/Local_Operations_Quickstart.md)
 
 ```bash
-# Backend (port 8000)
+make setup-local          # first time only
+make postgres-up
+make migrate
+bash scripts/dev.sh start # or double-click Start CIOS.command
+```
+
+Check status: `bash scripts/dev.sh status`
+
+Default login: `user@company.com` / `Ceragem2026!Adm` (System Administrator, local dev only)
+
+---
+
+## 5b. Legacy manual start
+
+```bash
 cd backend && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ./run_backend.sh
 
-# Frontend (port 3002)
 cd frontend && npm install && ./run_frontend.sh
 ```
-
-Default login: `user@company.com` / `Ceragem2026!Adm` (System Administrator)
 
 ---
 
@@ -163,28 +176,21 @@ Volume 12 QA catalog: `python tests/test_volume12_qa.py`
 
 ## Local development (quick start)
 
-PostgreSQL must be reachable at `127.0.0.1:5432` (Docker or Homebrew). Credentials match `backend/.env`.
-
-**One command** (Postgres + migrate + backend + frontend):
+PostgreSQL must be reachable at `127.0.0.1:5432`. See **[Local Operations Quickstart](./docs/Local_Operations_Quickstart.md)**.
 
 ```bash
-bash scripts/dev_local.sh
-```
-
-**Or step by step:**
-
-```bash
-make postgres-up          # Docker PostgreSQL (optional if already running)
+make setup-local
+make postgres-up
 make migrate
-make backend              # http://127.0.0.1:8000
-make frontend             # http://localhost:3002
+bash scripts/dev.sh start    # keep Terminal open
+make dev-status              # diagnose issues
 ```
 
-Frontend API base URL: `frontend/.env.local` → `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000`
+Async uploads: `make worker` (or `bash scripts/dev.sh start --with-worker`)
 
 Health check: `curl http://127.0.0.1:8000/api/v1/health`
 
-Market Intelligence: [http://localhost:3002/market-intelligence](http://localhost:3002/market-intelligence)
+Login: [http://127.0.0.1:3002/login](http://127.0.0.1:3002/login)
 
 ---
 

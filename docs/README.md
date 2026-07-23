@@ -73,7 +73,8 @@ All ORION specifications live in **[`../../../ORION Project/ORION/`](../../../OR
 | 31 | [31_Development_Status_Report.md](./31_Development_Status_Report.md) | **Development Status Report (개발 현황 · v1.1.0)** |
 
 > **Live README:** Repository root [`README.md`](../README.md)  
-> **As-Built:** Volume 27 (v1.0.1) · **Current status:** Volume 31 (v1.1.0) · **Intelligence rebuild baseline:** Volume 29 · **Formulas reference:** Volume 30  
+> **Local ops:** [Local_Operations_Quickstart.md](./Local_Operations_Quickstart.md) · **Current status:** Volume 31 (v1.1.0)  
+> **As-Built:** Volume 27 (v1.0.1) · **Intelligence rebuild baseline:** Volume 29 · **Formulas reference:** Volume 30  
 > **Operations:** Volume 28.1
 
 ## API Base URL

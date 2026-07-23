@@ -191,6 +191,7 @@ Async upload 사용 시 별도 터미널: `make worker`
 |------|------|
 | [27_Development_Completion_Specification.md](./27_Development_Completion_Specification.md) | v1.0.1 As-Built |
 | [CHANGELOG.md](../CHANGELOG.md) | 릴리스 이력 |
+| [Local_Operations_Quickstart.md](./Local_Operations_Quickstart.md) | **로컬 운영 1페이지 (v1.1.0)** |
 | [28.1_Hybrid_Operations_Plan.md](./28.1_Hybrid_Operations_Plan.md) | 운영·성능 |
 | [14_System_Administration_Operations_Manual.md](./14_System_Administration_Operations_Manual.md) | Admin API |
 | [AGENTS.md](../AGENTS.md) | 코드·볼륨 매핑 |

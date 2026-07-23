@@ -1,4 +1,4 @@
-.PHONY: postgres-up postgres-down setup-2_5m migrate init-postgres worker backend frontend dev dev-daemon dev-stop dev-status dev-restart test-phase3 backup restore archive-sqlite cleanup-storage nightly-maintenance weekly-maintenance storage-audit
+.PHONY: postgres-up postgres-down setup-2_5m setup-local migrate init-postgres worker backend frontend dev dev-daemon dev-stop dev-status dev-restart test-phase3 backup restore archive-sqlite cleanup-storage nightly-maintenance weekly-maintenance storage-audit
 
 # CURDIR — spaces in path break abspath/dir (e.g. "Website Project/...").
 ROOT := $(CURDIR)/
@@ -23,6 +23,9 @@ postgres-down:
 
 setup-2_5m:
 	bash "$(ROOT)scripts/setup_2_5m_postgres.sh"
+
+setup-local:
+	bash "$(ROOT)scripts/setup_local.sh"
 
 migrate:
 	cd "$(ROOT)backend" && . .venv/bin/activate && alembic upgrade head
@@ -49,22 +52,22 @@ frontend:
 	cd "$(ROOT)frontend" && npm run dev
 
 dev:
-	bash "$(ROOT)scripts/dev_local.sh"
+	bash "$(ROOT)scripts/dev.sh" start
 
 dev-terminal:
-	bash "$(ROOT)scripts/dev_terminal.sh"
+	bash "$(ROOT)scripts/dev.sh" start
 
 dev-daemon:
 	bash "$(ROOT)scripts/dev_daemon.sh" start
 
 dev-stop:
-	bash "$(ROOT)scripts/dev_daemon.sh" stop
+	bash "$(ROOT)scripts/dev.sh" stop
 
 dev-status:
-	bash "$(ROOT)scripts/dev_daemon.sh" status
+	bash "$(ROOT)scripts/dev.sh" status
 
 dev-restart:
-	bash "$(ROOT)scripts/dev_daemon.sh" restart
+	bash "$(ROOT)scripts/dev.sh" restart
 
 frontend-build:
 	cd "$(ROOT)frontend" && npm run build

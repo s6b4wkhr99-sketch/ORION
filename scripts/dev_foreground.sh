@@ -80,8 +80,12 @@ echo "  Backend:  http://127.0.0.1:8000/api/v1/health"
 echo ""
 echo "Default login: user@company.com / Ceragem2026!Adm"
 echo ""
+# shellcheck source=dev_common.sh
+source "$ROOT/scripts/dev_common.sh"
+warn_upload_worker
 echo "IMPORTANT: Keep this Terminal window open while you work."
 echo "Press Ctrl+C here to stop both servers."
+echo "Status: bash scripts/dev.sh status"
 echo ""
 
 open "http://127.0.0.1:3002/login" 2>/dev/null || true

@@ -19,6 +19,7 @@ dist/
 # IDE & OS
 .idea/
 .vscode/
+.cursor/
 .DS_Store
 
 # Uploads & runtime artifacts
