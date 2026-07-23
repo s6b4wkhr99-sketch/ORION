@@ -378,8 +378,8 @@ export function OpportunityRadar({
                       r={r}
                       fill={fillColor}
                       fillOpacity={0.85}
-                      stroke="#fff"
-                      strokeWidth={1.5}
+                      stroke="rgba(255, 255, 255, 0.55)"
+                      strokeWidth={0.75}
                       style={{ cursor: "pointer" }}
                     />
                   );

@@ -1,12 +1,22 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
-import type { CommercialIntelligenceSummary } from "@/lib/api";
-import { filterStandingPromotions, normalizeActivePromotions, normalizePromotionCoverage, resolveBestStandingPromoSku } from "@/lib/standing-promotions";
+import { api, type CommercialIntelligenceSummary } from "@/lib/api";
+import {
+  normalizeActivePromotions,
+  normalizePromotionCoverage,
+  PROMOTION_COVERAGE_CACHE_VERSION,
+  resolveBestStandingPromoSku,
+  type PromotionCoverageRow,
+} from "@/lib/standing-promotions";
+import { promoStyleForCode, uniquePromoCodes } from "@/lib/promo-chip-styles";
+import { cn } from "@/lib/utils";
 import { WidgetShell } from "./widget-shell";
 
 type Props = {
   data: CommercialIntelligenceSummary;
+  uploadId?: string | null;
 };
 
 function HealthGauge({ score }: { score: number }) {
@@ -39,10 +49,67 @@ function bestPromotedMargin(highlight: CommercialIntelligenceSummary["highest_ma
   return "—";
 }
 
-export function CommercialIntelligencePanel({ data }: Props) {
+function PromoCodeBadge({
+  code,
+  promoCodes,
+  size = "md",
+}: {
+  code: string;
+  promoCodes: string[];
+  size?: "sm" | "md";
+}) {
+  const style = promoStyleForCode(code, promoCodes);
+  return (
+    <span
+      className={cn(
+        "rounded-full border font-semibold",
+        size === "sm" ? "px-1.5 py-0.5 text-[10px]" : "px-2.5 py-1 text-xs",
+        style.border,
+        style.bg,
+        style.text,
+      )}
+    >
+      {code}
+    </span>
+  );
+}
+
+export function CommercialIntelligencePanel({ data, uploadId }: Props) {
   const promos = normalizeActivePromotions(data.active_promotions ?? []);
   const bestPromotedSku = resolveBestStandingPromoSku(data);
-  const coverage = normalizePromotionCoverage(data.promotion_coverage ?? []);
+  const [coverage, setCoverage] = useState<PromotionCoverageRow[]>(() =>
+    normalizePromotionCoverage(data.promotion_coverage ?? []),
+  );
+  const [coverageError, setCoverageError] = useState<string | null>(null);
+  const promoCodes = uniquePromoCodes([
+    ...promos.map((row) => row.promo_code),
+    ...coverage.filter((row) => row.product).map((row) => row.promo_code),
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCoverageError(null);
+
+    api
+      .getPromotionCoverage(uploadId ?? undefined)
+      .then((snapshot) => {
+        if (cancelled) return;
+        if (snapshot.promotion_coverage_version !== PROMOTION_COVERAGE_CACHE_VERSION) {
+          setCoverageError("Promotion coverage version mismatch — refresh the page.");
+          return;
+        }
+        setCoverage(normalizePromotionCoverage(snapshot.promotion_coverage ?? []));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setCoverageError(error instanceof Error ? error.message : "Failed to load promotion coverage");
+        setCoverage(normalizePromotionCoverage(data.promotion_coverage ?? []));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [uploadId, data.promotion_coverage]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -52,7 +119,10 @@ export function CommercialIntelligencePanel({ data }: Props) {
             <p className="text-sm text-[var(--cios-secondary)]">No active promotion codes configured.</p>
           ) : (
             promos.map((row) => (
-              <div key={row.product} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm">
+              <div
+                key={row.product}
+                className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
+              >
                 <div>
                   <p className="font-medium text-gray-900">{row.product}</p>
                   <p className="text-xs text-[var(--cios-secondary)]">
@@ -60,9 +130,7 @@ export function CommercialIntelligencePanel({ data }: Props) {
                     {row.max_promotion > 0 ? ` · Max ${formatCurrency(row.max_promotion)}` : ""}
                   </p>
                 </div>
-                <span className="rounded-full bg-indigo-100 px-2.5 py-1 text-xs font-semibold text-indigo-700">
-                  {row.promo_code}
-                </span>
+                <PromoCodeBadge code={row.promo_code} promoCodes={promoCodes} />
               </div>
             ))
           )}
@@ -115,31 +183,59 @@ export function CommercialIntelligencePanel({ data }: Props) {
       <WidgetShell
         fill
         title="Promotion Coverage"
-        subtitle="Post-promo price addressable reach (% of targetable customers)"
+        subtitle="Conservative promo reach"
       >
         <div className="flex h-full min-h-0 flex-col gap-5">
-          {(coverage.length ? coverage : [{ promo_code: "—", customers: 0, coverage_pct: 0 }]).map((row) => {
+          {coverageError ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{coverageError}</p>
+          ) : null}
+          {(coverage.length ? coverage : [{ promo_code: "—", customers: 0, coverage_pct: 0, product: null }]).map((row) => {
             const convertParts: string[] = [];
+            if ((row.direct ?? 0) > 0 && (row.direct ?? 0) !== row.customers) {
+              convertParts.push(`${formatNumber(row.direct ?? 0)} direct`);
+            }
             if ((row.up_convert ?? 0) > 0) convertParts.push(`↑${formatNumber(row.up_convert ?? 0)} up`);
             if ((row.down_convert ?? 0) > 0) convertParts.push(`↓${formatNumber(row.down_convert ?? 0)} down`);
-            if ((row.direct ?? 0) > 0 && (row.up_convert ?? 0) + (row.down_convert ?? 0) > 0) {
-              convertParts.unshift(`${formatNumber(row.direct ?? 0)} direct`);
+            if ((row.segment_in ?? 0) > 0) convertParts.push(`◎${formatNumber(row.segment_in ?? 0)} segment`);
+            if ((row.afford_own ?? 0) > 0) {
+              convertParts.push(`${formatNumber(row.afford_own ?? 0)} afford own tier`);
             }
+            if ((row.unreachable ?? 0) > 0) {
+              convertParts.push(`${formatNumber(row.unreachable ?? 0)} unreachable`);
+            }
+            const isUnassigned = !row.product;
             return (
-              <div key={row.product ?? row.promo_code} className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span className="font-medium text-gray-800">
-                    {row.product ? `${row.product} · ${row.promo_code}` : row.promo_code}
+              <div key={row.product ?? "unassigned"} className="space-y-1">
+                <div className="flex justify-between gap-2 text-sm">
+                  <span className="inline-flex min-w-0 flex-wrap items-center gap-1.5 font-medium text-gray-800">
+                    {isUnassigned ? (
+                      row.kpi_basis === "conservative_unassigned"
+                        ? "Unassigned · no promo reach"
+                        : row.promo_code
+                    ) : (
+                      <>
+                        <span>{row.product}</span>
+                        <span className="text-[var(--cios-secondary)]">·</span>
+                        <PromoCodeBadge code={row.promo_code} promoCodes={promoCodes} size="sm" />
+                      </>
+                    )}
                   </span>
-                  <span className="text-[var(--cios-secondary)]">
-                    {formatNumber(row.customers)} · {row.coverage_pct}%
+                  <span className="shrink-0 text-[var(--cios-secondary)]">
+                    {row.product
+                      ? `${formatNumber(row.customers)} reach · ${row.coverage_pct}%`
+                      : `${formatNumber(row.customers)} · ${row.coverage_pct}%`}
                   </span>
                 </div>
                 {convertParts.length > 0 ? (
-                  <p className="text-[11px] text-[var(--cios-secondary)]">{convertParts.join(" · ")}</p>
+                  <p className="text-[11px] text-[var(--cios-secondary)]">
+                    Composition: {convertParts.join(" · ")}
+                  </p>
                 ) : null}
                 <div className="h-2 overflow-hidden rounded-full bg-gray-100">
-                  <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.min(100, row.coverage_pct)}%` }} />
+                  <div
+                    className={`h-full rounded-full ${row.product ? "bg-indigo-500" : "bg-gray-400"}`}
+                    style={{ width: `${Math.min(100, row.coverage_pct)}%` }}
+                  />
                 </div>
               </div>
             );

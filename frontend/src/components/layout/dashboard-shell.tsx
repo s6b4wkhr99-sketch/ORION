@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { FilterProvider, FiltersReadyGate } from "@/contexts/filter-context";
+import { AuthGate } from "@/components/auth/auth-gate";
 import { ToastProvider } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/config";
@@ -28,8 +29,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   }, [mobileNavOpen]);
 
   return (
-    <FilterProvider>
-      <ToastProvider>
+    <AuthGate>
+      <FilterProvider>
+        <ToastProvider>
         <div className="min-h-screen bg-[var(--cios-background)]">
           <div
             className={cn(
@@ -83,7 +85,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             </div>
           </main>
         </div>
-      </ToastProvider>
-    </FilterProvider>
+        </ToastProvider>
+      </FilterProvider>
+    </AuthGate>
   );
 }

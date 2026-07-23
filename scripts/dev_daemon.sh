@@ -53,8 +53,11 @@ health_backend() {
 
 health_frontend() {
   local code
-  code=$(curl -s -o /dev/null -m 2 -w "%{http_code}" http://127.0.0.1:3002/ 2>/dev/null || echo "000")
-  [ "$code" != "000" ]
+  for url in "http://127.0.0.1:3002/" "http://localhost:3002/"; do
+    code=$(curl -s -o /dev/null -m 2 -w "%{http_code}" "$url" 2>/dev/null || echo "000")
+    [ "$code" != "000" ] && [ -n "$code" ] && return 0
+  done
+  return 1
 }
 
 stop_service() {
@@ -92,6 +95,7 @@ stop_all_dev() {
   stop_service "frontend" "$FRONTEND_PID_FILE" 3002
   stop_service "backend" "$BACKEND_PID_FILE" 8000
   pkill -f "next dev --webpack -p 3002" 2>/dev/null || true
+  pkill -f "next start -p 3002" 2>/dev/null || true
   pkill -f "uvicorn app.main:app --host 127.0.0.1 --port 8000" 2>/dev/null || true
 }
 
@@ -132,6 +136,7 @@ ensure_frontend_env() {
     cat > "$FRONTEND/.env.local" <<'EOF'
 NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
 NEXT_PUBLIC_SHOW_CAMPAIGN_MODULES=false
+NEXT_PUBLIC_AUTH_REQUIRED=true
 EOF
   fi
   if [ ! -d "$FRONTEND/node_modules" ]; then
@@ -143,6 +148,10 @@ EOF
 start_backend() {
   local pid
   pid="$(read_pid_file "$BACKEND_PID_FILE")"
+  if [ -n "$pid" ] && ! is_running "$pid"; then
+    rm -f "$BACKEND_PID_FILE"
+    pid=""
+  fi
   if is_running "$pid" && health_backend; then
     echo "==> Backend already running (pid $pid)"
     return 0
@@ -182,6 +191,10 @@ start_backend() {
 start_frontend() {
   local pid
   pid="$(read_pid_file "$FRONTEND_PID_FILE")"
+  if [ -n "$pid" ] && ! is_running "$pid"; then
+    rm -f "$FRONTEND_PID_FILE"
+    pid=""
+  fi
   if is_running "$pid" && health_frontend; then
     echo "==> Frontend already running (pid $pid)"
     return 0
@@ -189,33 +202,70 @@ start_frontend() {
   stop_service "frontend" "$FRONTEND_PID_FILE" 3002
   ensure_frontend_env
 
-  echo "==> Starting frontend (port 3002)..."
-  pid="$(
-    launch_detached "$LOG_DIR/frontend.log" bash -c '
-      while true; do
-        cd "'"$FRONTEND"'" && ./node_modules/.bin/next dev --webpack -p 3002 -H 127.0.0.1
-        echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) frontend exited; restarting in 2s" >> "'"$LOG_DIR/frontend.log"'"
-        sleep 2
-      done
-    '
-  )"
+  local frontend_mode="${CIOS_FRONTEND_MODE:-dev}"
+  echo "==> Starting frontend (port 3002, mode=$frontend_mode)..."
+
+  if [ "$frontend_mode" = "dev" ]; then
+    pid="$(
+      launch_detached "$LOG_DIR/frontend.log" bash -c '
+        while true; do
+          cd "'"$FRONTEND"'" && ./node_modules/.bin/next dev --webpack -p 3002 -H 127.0.0.1
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) frontend exited; restarting in 2s" >> "'"$LOG_DIR/frontend.log"'"
+          sleep 2
+        done
+      '
+    )"
+  else
+    pid="$(
+      launch_detached "$LOG_DIR/frontend.log" bash -c '
+        cd "'"$FRONTEND"'"
+        if [ ! -f .next/BUILD_ID ]; then
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) building frontend (first run, ~2-4 min)..." >> "'"$LOG_DIR/frontend.log"'"
+          ./node_modules/.bin/next build >> "'"$LOG_DIR/frontend.log"'" 2>&1 || exit 1
+        fi
+        mkdir -p .next/standalone/frontend/.next
+        cp -R public .next/standalone/frontend/public 2>/dev/null || true
+        cp -R .next/static .next/standalone/frontend/.next/static 2>/dev/null || true
+        while true; do
+          cd .next/standalone/frontend && PORT=3002 HOSTNAME=:: node server.js
+          echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) frontend exited; restarting in 2s" >> "'"$LOG_DIR/frontend.log"'"
+          sleep 2
+        done
+      '
+    )"
+  fi
   echo "$pid" >"$FRONTEND_PID_FILE"
 
-  for _ in $(seq 1 90); do
-    health_frontend && break
-    sleep 1
-  done
+  if [ "$frontend_mode" = "stable" ] && [ ! -f "$FRONTEND/.next/BUILD_ID" ]; then
+    echo "    Building frontend (first run — may take 2-4 min). Tail: $LOG_DIR/frontend.log"
+    for _ in $(seq 1 300); do
+      health_frontend && break
+      sleep 2
+    done
+  else
+    for _ in $(seq 1 90); do
+      health_frontend && break
+      sleep 1
+    done
+  fi
   if ! health_frontend; then
     echo "ERROR: Frontend failed to start. See $LOG_DIR/frontend.log"
     tail -n 20 "$LOG_DIR/frontend.log" 2>/dev/null || true
     return 1
   fi
-  echo "    Frontend OK — http://localhost:3002/mission-control"
+  echo "    Frontend OK — http://127.0.0.1:3002/mission-control"
 }
 
 cmd_start() {
   echo "==> Ceragem CIOS — detached dev servers"
   ensure_postgres
+  ensure_backend_venv
+  echo "==> Invalidating dashboard cache (promo/coverage policy changes)..."
+  (
+    cd "$BACKEND"
+    export DATABASE_URL="$PG_URL"
+    PYTHONPATH=. .venv/bin/python -c "from app.cache.dashboard_cache import invalidate_dashboard_cache; invalidate_dashboard_cache()"
+  ) || echo "    (cache invalidate skipped — backend venv not ready)"
   start_backend
   start_frontend
   echo ""
@@ -239,6 +289,11 @@ cmd_status() {
   echo "Ceragem CIOS dev status"
   echo "  Backend  supervisor=${bp:-—}  listener=${bl:-—}  health=$(health_backend && echo up || echo down)"
   echo "  Frontend supervisor=${fp:-—}  listener=${fl:-—}  health=$(health_frontend && echo up || echo down)"
+  if [ -z "$bl" ] || [ -z "$fl" ]; then
+    echo ""
+    echo "  One or more servers are down. Run: make dev-restart"
+    echo "  Or double-click: Start CIOS.command (keep Terminal open)"
+  fi
   echo "  Logs: $LOG_DIR/"
 }
 

@@ -43,7 +43,7 @@ PRIZM_PRODUCT_LADDERS: dict[str, tuple[str, ...]] = {
     "Aging in Place": ("Pause M6s", "Pause M4", "Master S4", "Master V5"),
     "Caregiving Households": ("Master S4", "Pause M6s", "Pause M4", "Master V5"),
     "Simple Life": ("Master S4", "Pause M6s", "Pause M4", "Master V5"),
-    "Unknown": ("Pause M4", "Pause M6s", "Master S4", "Pause M6"),
+    "Unknown": ("Master S4", "Pause M6s", "Pause M4", "Pause M6"),
 }
 
 _VALUE_PRIZM = frozenset({"Simple Life", "Caregiving Households", "Unknown"})

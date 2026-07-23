@@ -302,7 +302,7 @@ export default function ImportPage() {
           <h2 className="text-base font-semibold text-gray-900">Upload Guidelines</h2>
           <ul className="space-y-2 text-sm text-[var(--cios-secondary)]">
             <li>CSV or Excel format, UTF-8 encoding</li>
-            <li>Maximum file size 100 MB</li>
+            <li>Maximum file size 500 MB</li>
             <li>Required: Email (auto-mapped to email_address)</li>
             <li>State, ZIP, and Datalogix fields mapped automatically</li>
             <li>Unknown headers are logged — upload is not blocked</li>

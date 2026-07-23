@@ -21,6 +21,7 @@ import { PageSkeleton } from "@/components/ui/skeleton";
 import { useFilters } from "@/contexts/filter-context";
 import { api, type ExecutiveDashboardRadarOpportunity, type ExecutiveDashboardStatePerformance, type ExecutiveSummary } from "@/lib/api";
 import { dashboardCacheKey, readDashboardCache, writeDashboardCache } from "@/lib/dashboard-cache";
+import { isStalePromotionCoverageCache, PROMOTION_COVERAGE_CACHE_VERSION } from "@/lib/standing-promotions";
 import { resolveOpportunityScore } from "@/lib/opportunity-targeting";
 import { formatCurrency, formatNumber, formatPercent, resolvePredictedConversionRate } from "@/lib/utils";
 
@@ -215,30 +216,49 @@ export default function MissionControlPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const cacheKey = dashboardCacheKey("executive", selectedUploadId, uploadsSignatureKey || "boot", dataRevision);
+    let cancelled = false;
+    const cacheKey = dashboardCacheKey(
+      "executive",
+      PROMOTION_COVERAGE_CACHE_VERSION,
+      selectedUploadId,
+      uploadsSignatureKey || "boot",
+      dataRevision,
+    );
     const cached = readDashboardCache<ExecutiveSummary>(cacheKey, 5 * 60 * 1000);
-    if (cached) {
+    const usableCache = cached && !isStalePromotionCoverageCache(cached.commercial_intelligence);
+
+    if (usableCache) {
       setData(cached);
       setLoading(false);
+      setRefreshing(true);
+    } else {
+      setLoading(true);
       setRefreshing(false);
-      setError(null);
-      return;
     }
-
-    setLoading(true);
-    setRefreshing(false);
     setError(null);
+
     api
       .getExecutive(selectedUploadId ?? undefined)
       .then((summary) => {
+        if (cancelled) return;
         setData(summary);
         writeDashboardCache(cacheKey, summary);
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load mission control"))
+      .catch((e) => {
+        if (cancelled) return;
+        if (!usableCache) {
+          setError(e instanceof Error ? e.message : "Failed to load mission control");
+        }
+      })
       .finally(() => {
+        if (cancelled) return;
         setLoading(false);
         setRefreshing(false);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedUploadId, dataRevision, uploadsSignatureKey]);
 
   const model = useMemo(() => {
@@ -426,7 +446,7 @@ export default function MissionControlPage() {
       />
 
       {data.commercial_intelligence && (
-        <CommercialIntelligencePanel data={data.commercial_intelligence} />
+        <CommercialIntelligencePanel data={data.commercial_intelligence} uploadId={selectedUploadId} />
       )}
 
       <div className="grid gap-6 xl:grid-cols-2">

@@ -2,7 +2,7 @@
 
 from app.rules.library import get_rule
 
-MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # RULE-UP-002: 100 MB
+MAX_UPLOAD_BYTES = 500 * 1024 * 1024  # RULE-UP-002: 500 MB
 ALLOWED_EXTENSIONS = {"csv", "xlsx", "xls"}
 
 

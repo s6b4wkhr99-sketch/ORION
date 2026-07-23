@@ -1,6 +1,15 @@
 const TOKEN_KEY = "cios_auth_token";
+const SESSION_KEY = "cios_auth_session";
 
 type ApiEnvelope<T> = { success: boolean; data?: T; message?: string; error?: { message?: string } };
+
+export type AuthSession = {
+  email: string;
+  name: string;
+  role: string;
+  modules?: string[];
+  allowedMenus?: string[] | null;
+};
 
 function getApiBase(): string {
   const configured = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "");
@@ -43,6 +52,10 @@ function extractErrorMessage(body: unknown, fallback: string): string {
   if (typeof body !== "object" || body === null) return fallback;
   const record = body as Record<string, unknown>;
   if (typeof record.detail === "string" && record.detail) return record.detail;
+  if (typeof record.detail === "object" && record.detail !== null) {
+    const detail = record.detail as Record<string, unknown>;
+    if (typeof detail.message === "string" && detail.message) return detail.message;
+  }
   if (typeof record.message === "string" && record.message) return record.message;
   const nested = record.error;
   if (typeof nested === "object" && nested !== null && typeof (nested as { message?: string }).message === "string") {
@@ -76,7 +89,7 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   if (!res.ok) {
     const message = extractErrorMessage(body, raw || `Request failed: ${res.status}`);
     if (res.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem(TOKEN_KEY);
+      api.clearSession();
     }
     throw new Error(message);
   }
@@ -117,25 +130,72 @@ function mapCustomerRow(row: Record<string, unknown>): CustomerRow {
 }
 
 export const api = {
+  hasStoredToken: (): boolean => {
+    if (typeof window === "undefined") return false;
+    return Boolean(localStorage.getItem(TOKEN_KEY));
+  },
+  persistSession: (session: AuthSession) => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  },
+  readStoredSession: (): AuthSession | null => {
+    if (typeof window === "undefined") return null;
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    try {
+      return JSON.parse(raw) as AuthSession;
+    } catch {
+      return null;
+    }
+  },
+  clearSession: () => {
+    if (typeof window === "undefined") return;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(SESSION_KEY);
+  },
   login: async (email: string, password: string) => {
+    const normalizedEmail = email.trim().toLowerCase();
     const res = await fetch(`${getApiBase()}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email: normalizedEmail, password }),
     });
-    const body = (await res.json()) as ApiEnvelope<{ token: string; expires: string }>;
+    const body = (await res.json()) as ApiEnvelope<{ token: string; expires: string; role: string; email?: string; name?: string }>;
     if (!res.ok || !body.success || !body.data) throw new Error(body.message ?? "Login failed");
     localStorage.setItem(TOKEN_KEY, body.data.token);
-    return body.data;
+    try {
+      const me = await fetchJson<AuthSession & { modules: string[]; allowedModules: string[] | null }>("/auth/me");
+      const session: AuthSession = {
+        ...me,
+        allowedMenus:
+          me.allowedModules?.length && me.allowedModules[0]?.startsWith("/") ? me.allowedModules : null,
+      };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      return session;
+    } catch {
+      const session: AuthSession = {
+        email: body.data.email ?? normalizedEmail,
+        name: body.data.name ?? normalizedEmail.split("@")[0],
+        role: body.data.role ?? "Read Only",
+      };
+      localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      return session;
+    }
   },
-  logout: () => localStorage.removeItem(TOKEN_KEY),
+  logout: () => {
+    api.clearSession();
+  },
+  getAuthMe: () =>
+    fetchJson<AuthSession & { modules: string[]; allowedModules: string[] | null }>("/auth/me"),
   getHealth: () =>
     fetchJson<{
       database?: { status?: string; postgres?: boolean; url_scheme?: string };
       upload_pipeline?: { async?: boolean; bulk_mode?: boolean; customer_analysis_only?: boolean; ready_for_2_5m?: boolean };
     }>("/health"),
-  getUploads: () =>
-    fetchJsonDeduped<{ uploads: UploadSummary[] }>("/uploads").then((d) => d.uploads ?? (d as unknown as UploadSummary[])),
+  getUploads: (datasetType?: "prospect" | "buyer") =>
+    fetchJsonDeduped<{ uploads: UploadSummary[] }>(
+      `/uploads${datasetType ? `?dataset_type=${datasetType}` : ""}`,
+    ).then((d) => d.uploads ?? (d as unknown as UploadSummary[])),
   getUploadProcessingProfile: (estimatedRows?: number) =>
     fetchJson<UploadProcessingProfile>(
       `/uploads/processing-profile${estimatedRows != null ? `?estimated_rows=${estimatedRows}` : ""}`,
@@ -194,6 +254,63 @@ export const api = {
       },
     } satisfies UploadResult;
   },
+  previewBuyerUpload: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetchJson<BuyerUploadPreview>("/buyers/upload/preview", { method: "POST", body: form });
+  },
+  uploadBuyerFile: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return fetchJson<BuyerUploadResult>("/buyers/upload", { method: "POST", body: form });
+  },
+  getBuyerGapReport: (uploadId: string) => fetchJson<BuyerGapReport>(`/buyers/upload/${uploadId}/gap-report`),
+  getBuyerProspectMatchStats: () => fetchJson<BuyerProspectMatchStats>("/buyers/prospect-match-stats"),
+  deleteBuyerUpload: async (uploadId: string) => {
+    try {
+      return await fetchJson<{ deleted: string }>(`/buyers/upload/${uploadId}`, { method: "DELETE" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Delete failed";
+      if (message === "Not Found" || /404/.test(message)) {
+        return fetchJson<{ deleted: string }>(`/upload/${uploadId}`, { method: "DELETE" });
+      }
+      throw err;
+    }
+  },
+  downloadBuyerMatchedCsv: async (uploadId: string) => {
+    const res = await fetch(`${getApiBase()}/buyers/upload/${uploadId}/matched-download`, {
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const raw = await res.text();
+      let message = raw || `Download failed: ${res.status}`;
+      try {
+        const body = JSON.parse(raw) as { message?: string; detail?: string | { message?: string } };
+        if (typeof body.detail === "object" && body.detail?.message) {
+          message = body.detail.message;
+        } else if (typeof body.detail === "string" && body.detail) {
+          message = body.detail;
+        } else if (body.message) {
+          message = body.message;
+        }
+      } catch {
+        // keep raw message
+      }
+      throw new Error(message);
+    }
+    const blob = await res.blob();
+    if (!blob.size) {
+      throw new Error("Download returned an empty file.");
+    }
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `buyer_matched_${uploadId.slice(0, 8)}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  },
   uploadCampaignReport: async (file: File) => {
     const form = new FormData();
     form.append("file", file);
@@ -214,6 +331,10 @@ export const api = {
   },
   getExecutive: (uploadId?: string) =>
     fetchJsonDeduped<ExecutiveSummary>(`/dashboard/executive${uploadId ? `?upload_id=${uploadId}` : ""}`),
+  getPromotionCoverage: (uploadId?: string) =>
+    fetchJson<PromotionCoverageSnapshot>(
+      `/dashboard/promotion-coverage${uploadId ? `?upload_id=${uploadId}` : ""}`,
+    ),
   getCustomers: async (uploadId?: string) => {
     const data = await fetchJsonDeduped<CustomerDashboard>(`/dashboard/customer${uploadId ? `?upload_id=${uploadId}` : ""}`);
     return {
@@ -296,6 +417,53 @@ export const api = {
   getDailyChecklist: () => fetchJson<OpsChecklist>("/admin/checklists/daily"),
   getEndOfDayChecklist: () => fetchJson<OpsChecklist>("/admin/checklists/end-of-day"),
   getAdminUsers: () => fetchJson<{ users: AdminUser[]; roles: string[] }>("/admin/users"),
+  createAdminUser: (payload: {
+    email: string;
+    password: string;
+    name: string;
+    role: string;
+    allowedModules?: string[] | null;
+  }) =>
+    fetchJson<AdminUser>("/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  updateAdminUser: (
+    email: string,
+    payload: {
+      email?: string;
+      name?: string;
+      role?: string;
+      menuAccessMode?: "role" | "custom";
+      allowedModules?: string[] | null;
+    },
+  ) =>
+    fetchJson<AdminUser>(`/admin/users/${encodeURIComponent(email)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
+  assignUserRole: (email: string, role: string) =>
+    fetchJson<{ email: string; role: string }>(`/admin/users/${encodeURIComponent(email)}/role`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    }),
+  resetUserPassword: (email: string, password: string) =>
+    fetchJson<{ email: string }>(`/admin/users/${encodeURIComponent(email)}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    }),
+  disableAdminUser: (email: string) =>
+    fetchJson<{ email: string; isActive: boolean }>(`/admin/users/${encodeURIComponent(email)}/disable`, { method: "POST" }),
+  activateAdminUser: (email: string) =>
+    fetchJson<{ email: string; isActive: boolean }>(`/admin/users/${encodeURIComponent(email)}/activate`, { method: "POST" }),
+  unlockAdminUser: (email: string) =>
+    fetchJson<{ email: string }>(`/admin/users/${encodeURIComponent(email)}/unlock`, { method: "POST" }),
+  deleteAdminUser: (email: string) =>
+    fetchJson<{ email: string; deleted: boolean }>(`/admin/users/${encodeURIComponent(email)}`, { method: "DELETE" }),
   createExport: async (opts: {
     provider: string;
     campaignName: string;
@@ -324,20 +492,60 @@ export const api = {
     return { export_id: queued.exportId, file_url: fileUrl, status: finalStatus.status };
   },
   simulateCommercial: (body: {
-    product: string;
+    product?: string;
+    products?: string[];
+    additionalProducts?: string[];
     targetCustomers?: number;
+    targetCustomersBySku?: { sku: string; count: number }[];
     sellingPrice?: number;
     promotionPct?: number;
     maxPromotion?: number;
+    additionalPromotionPct?: number;
+    additionalPromotionMax?: number;
     promoCode?: string;
     leFrameIncentiveRate?: number;
     corporatePriority?: number;
     inventoryUnits?: number;
+    conversionRate?: number;
   }) =>
     fetchJson<CommercialSimulationResult>("/commercial/simulate", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...getAuthHeaders() },
       body: JSON.stringify(body),
+    }),
+  analyzeAudienceExport: async (
+    file: File,
+    opts?: {
+      corporatePriority?: number;
+      leFrameRate?: number;
+      inventoryUnits?: number;
+      conversionRate?: number;
+    },
+  ) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (opts?.corporatePriority != null) form.append("corporatePriority", String(opts.corporatePriority));
+    if (opts?.leFrameRate != null) form.append("leFrameIncentiveRate", String(opts.leFrameRate));
+    if (opts?.inventoryUnits != null) form.append("inventoryUnits", String(opts.inventoryUnits));
+    if (opts?.conversionRate != null) form.append("conversionRate", String(opts.conversionRate));
+    return fetchJson<AudienceExportAnalysisResult>("/commercial/simulate/audience-upload", {
+      method: "POST",
+      body: form,
+    });
+  },
+  saveCommercialSimulatorForecast: (body: CommercialSimulatorForecastSaveRequest) =>
+    fetchJson<CommercialSimulatorForecastRecord>("/commercial/simulator/forecasts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify(body),
+    }),
+  listCommercialSimulatorForecasts: () =>
+    fetchJsonDeduped<{ items: CommercialSimulatorForecastSummary[] }>("/commercial/simulator/forecasts"),
+  getCommercialSimulatorForecast: (id: string) =>
+    fetchJson<CommercialSimulatorForecastRecord>(`/commercial/simulator/forecasts/${id}`),
+  deleteCommercialSimulatorForecast: (id: string) =>
+    fetchJson<{ deleted: boolean; id: string }>(`/commercial/simulator/forecasts/${id}`, {
+      method: "DELETE",
     }),
   getCommercialVersions: () => fetchJson<{ versions: CommercialCatalogVersion[] }>("/commercial/versions"),
   getCommercialCatalog: () => fetchJsonDeduped<CommercialCatalogSnapshot>("/commercial/catalog"),
@@ -500,6 +708,7 @@ export type UploadProcessingProfile = {
 export type UploadSummary = {
   id: string;
   file_name: string;
+  dataset_type?: "prospect" | "buyer" | string;
   total_rows: number;
   valid_emails: number;
   status: string;
@@ -512,6 +721,53 @@ export type UploadResult = {
   file_name: string;
   status: string;
   summary: Record<string, unknown>;
+};
+
+export type BuyerUploadPreview = {
+  file_name: string;
+  total_rows: number;
+  chair_rows: number;
+  unique_emails: number;
+  sku_distribution: Record<string, number>;
+  detected_format: string;
+  fatal_errors: string[];
+  warnings: string[];
+  sample_headers?: string[];
+};
+
+export type BuyerUploadResult = {
+  upload_id: string;
+  file_name: string;
+  status: string;
+  matched_emails: number;
+  unique_emails: number;
+  match_rate_pct: number;
+  summary: Record<string, unknown>;
+  gap_report?: BuyerGapReport;
+};
+
+export type BuyerGapReport = {
+  upload_id: string;
+  chair_rows: number;
+  unique_emails: number;
+  matched_emails: number;
+  matched_rows: number;
+  match_rate_pct: number;
+  intel_exact_hit_rate_pct?: number;
+  aggregate_gap?: {
+    raw_distribution_gap?: Record<string, { buyer_pct: number; prospect_pct: number; gap_points: number }>;
+    reweighted_distribution_gap?: Record<string, { buyer_pct: number; prospect_pct: number; gap_points: number }>;
+  };
+  calibration_backlog?: Array<Record<string, unknown>>;
+  state_other_rows?: number;
+  reweight_ca_bias_index?: number | string | null;
+};
+
+export type BuyerProspectMatchStats = {
+  buyer_unique_emails: number;
+  buyer_matched_emails: number;
+  buyer_match_rate_pct: number;
+  prospect_emails_with_intel: number;
 };
 
 export type UploadPreview = {
@@ -689,6 +945,12 @@ export type CommercialSkuHighlight = {
 
 export type CommercialSkuKpiRow = CommercialSkuHighlight & { product: string };
 
+export type PromotionCoverageSnapshot = {
+  promotion_coverage_version: string;
+  promotion_coverage: CommercialIntelligenceSummary["promotion_coverage"];
+  db_customers?: number;
+};
+
 export type CommercialIntelligenceSummary = {
   commercial_version: string;
   pricing_version: string;
@@ -711,8 +973,12 @@ export type CommercialIntelligenceSummary = {
     direct?: number;
     up_convert?: number;
     down_convert?: number;
+    segment_in?: number;
+    afford_own?: number;
+    unreachable?: number;
     kpi_basis?: string;
   }[];
+  promotion_coverage_version?: string;
   commercial_health_score: number;
   highest_margin_sku: CommercialSkuHighlight;
   highest_profit_sku: CommercialSkuHighlight;
@@ -879,6 +1145,10 @@ export type AudienceExportRecommendation = {
 export type CommercialSimulationResult = {
   simulation: boolean;
   product: string;
+  products?: string[];
+  main_product?: string;
+  multi_sku?: boolean;
+  by_product?: CommercialSimulationProductSlice[];
   target_customers: number;
   effective_customers: number;
   opportunity_score: number;
@@ -892,6 +1162,85 @@ export type CommercialSimulationResult = {
   promo_code: string | null;
   capped_promotion: boolean;
   recommended_lifestyle: string | null;
+};
+
+export type CommercialSimulationProductSlice = {
+  product?: string;
+  target_customers?: number;
+  effective_customers?: number;
+  opportunity_score?: number;
+  conversion_prediction?: number;
+  expected_orders?: number;
+  revenue_forecast?: number;
+  net_profit?: number;
+  le_frame_revenue?: number;
+  recommended_promotion?: number;
+  promo_code?: string | null;
+  capped_promotion?: boolean;
+  recommended_lifestyle?: string | null;
+};
+
+export type AudienceExportAnalysisResult = {
+  audience: {
+    target_customers: number;
+    product: string;
+    campaign_name?: string | null;
+    campaign_id?: string | null;
+    promo_code?: string | null;
+    avg_promotion?: number | null;
+    promotion_pct?: number | null;
+    avg_selling_price?: number | null;
+    top_states: { state: string; count: number }[];
+    sku_mix: { sku: string; count: number }[];
+    promo_code_mix: { promo_code: string; count: number }[];
+    file_rows: number;
+  };
+  simulation: CommercialSimulationResult;
+};
+
+export type CommercialSimulatorForecastInputs = {
+  mainSku: string;
+  additionalSkus: string[];
+  targetCustomers: number;
+  additionalPromotionPct: string;
+  additionalPromotionMax: string;
+  leFrameRate: string;
+  conversionRate: string;
+  corporatePriority: number;
+  inventoryUnits: string;
+  audienceFileName?: string | null;
+};
+
+export type CommercialSimulatorForecastSummary = {
+  id: string;
+  name: string;
+  mainSku: string;
+  additionalSkus: string[];
+  targetCustomers: number;
+  expectedOrders: number;
+  revenueForecast: number;
+  netProfit: number;
+  conversionPrediction: number;
+  opportunityScore: number;
+  audienceFileName?: string | null;
+  createdAt?: string | null;
+  createdBy?: string | null;
+};
+
+export type CommercialSimulatorForecastRecord = CommercialSimulatorForecastSummary & {
+  inputs: CommercialSimulatorForecastInputs;
+  result: CommercialSimulationResult;
+  audience?: AudienceExportAnalysisResult["audience"] | null;
+};
+
+export type CommercialSimulatorForecastSaveRequest = {
+  name?: string;
+  mainSku: string;
+  additionalSkus?: string[];
+  inputs: CommercialSimulatorForecastInputs;
+  result: CommercialSimulationResult;
+  audience?: AudienceExportAnalysisResult["audience"] | null;
+  audienceFileName?: string | null;
 };
 
 export type CampaignOverview = {
@@ -1503,6 +1852,7 @@ export type AdminUser = {
   isLocked: boolean;
   failedLoginAttempts: number;
   createdAt: string | null;
+  allowedModules: string[] | null;
 };
 
 export type OperationalMetrics = {

@@ -2,8 +2,10 @@
 
 Use this module when reasoning about how standing promotions change the consumer-facing
 price and which promo SKU a cohort can realistically reach (up-convert, down-convert,
-or keep). Promotion Coverage and Opportunity Radar can consume these helpers without
-re-implementing price thresholds in each layer.
+or keep). Promotion Coverage uses **conservative reach** per SKU: direct + segment-in
+(M10) + ↑/↓ only when the primary SKU is not post-promo accessible (afford-own gate).
+Cohorts that afford their own tier are tracked as unassigned. Opportunity Radar is
+unchanged. See ``aggregate_conservative_promo_coverage``.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ from sqlalchemy import func
 
 from app.commercial.engine import PRICE_RESISTANCE_DOWNGRADE, effective_customer_payment
 from app.commercial.promotion_policy import is_promotion_active, standing_promo_product_order
-from app.intelligence.ceragem_rules import parse_ceragem_axis, segment_axis_is_pain
+from app.intelligence.ceragem_rules import parse_ceragem_axis, parse_ceragem_tier, segment_axis_is_pain
 from app.intelligence.promotion_policy_constants import (
     PP_ACCESSIBILITY_AFFLUENT_MIN_PRICE,
     PP_ACCESSIBILITY_HIGH_MIN_PRICE,
@@ -301,6 +303,129 @@ def aggregate_price_responsive_promo_coverage(
             "avg_accessibility_fit": round(bucket["fit_sum"] / customers, 3) if customers else 0.0,
         }
     return result
+
+
+def eligible_m10_segment_coverage(
+    primary_sku: str,
+    *,
+    purchase_power_category: str | None = None,
+    ceragem_segment: str | None = None,
+) -> bool:
+    """True when a cohort should reach Pause M10 via Coverage segment-in (not price ladder)."""
+    primary = normalize_product_code((primary_sku or "").strip())
+    if not primary:
+        return False
+    tier = parse_ceragem_tier(ceragem_segment or "")
+    axis = parse_ceragem_axis(ceragem_segment or "")
+    pp = (purchase_power_category or "").strip()
+    if tier == "High+" and axis == "Wellness" and pp == "High" and primary in {"Master V9", "Master V7"}:
+        return True
+    if primary in {"Pause M6", "Pause M6s"}:
+        from app.campaign.standing_promo_demand import standing_promo_outreach_product
+
+        return standing_promo_outreach_product(primary, purchase_power=pp or None, ceragem_segment=ceragem_segment) == "Pause M10"
+    return False
+
+
+def aggregate_conservative_promo_coverage(
+    cohort_rows: list[dict],
+) -> tuple[dict[str, dict[str, int | float]], dict[str, int]]:
+    """
+    Conservative Promotion Coverage reach — at most one standing-promo SKU per cohort row.
+
+    - Pause M10: segment-in (S) for wellness-premium V9/V7 (+ pause-map donors) when accessible.
+    - Other standing promos: direct keep, or ↑/↓ only when the primary SKU is not post-promo
+      accessible (afford-own gate).
+    - Remaining cohorts (afford own tier, unreachable, non-standing outreach) → unassigned.
+    """
+    standing = set(standing_promo_product_order())
+    totals: dict[str, dict[str, float]] = defaultdict(
+        lambda: {
+            "customers": 0.0,
+            "direct": 0.0,
+            "up_convert": 0.0,
+            "down_convert": 0.0,
+            "segment_in": 0.0,
+            "fit_sum": 0.0,
+        }
+    )
+    unassigned = {"customers": 0, "afford_own": 0, "unreachable": 0}
+
+    for row in cohort_rows:
+        primary = normalize_product_code(str(row.get("product") or ""))
+        customers = int(row.get("customers") or 0)
+        if not primary or customers <= 0:
+            continue
+        pp = row.get("purchase_power_category")
+        zip_tier = row.get("zip_income_tier")
+        segment = row.get("ceragem_segment")
+
+        if (
+            "Pause M10" in standing
+            and is_promotion_active("Pause M10")
+            and eligible_m10_segment_coverage(primary, purchase_power_category=pp, ceragem_segment=segment)
+            and is_post_promo_accessible("Pause M10", purchase_power_category=pp, zip_income_tier=zip_tier)
+        ):
+            bucket = totals["Pause M10"]
+            bucket["customers"] += customers
+            bucket["segment_in"] += customers
+            pp_score = purchase_power_score(pp, zip_tier or zip_income_tier_from_pp_category(pp))
+            bucket["fit_sum"] += customers * accessibility_fit("Pause M10", pp_score)
+            continue
+
+        response = resolve_promo_price_response(
+            primary,
+            purchase_power_category=pp,
+            zip_income_tier=zip_tier,
+            ceragem_segment=segment,
+        )
+        outreach = normalize_product_code(response.outreach_sku)
+
+        if response.direction in {PromoPriceDirection.UP, PromoPriceDirection.DOWN}:
+            if is_post_promo_accessible(
+                primary,
+                purchase_power_category=pp,
+                zip_income_tier=zip_tier,
+            ):
+                unassigned["customers"] += customers
+                unassigned["afford_own"] += customers
+                continue
+
+        if response.direction == PromoPriceDirection.UNREACHABLE or outreach not in standing:
+            unassigned["customers"] += customers
+            unassigned["unreachable"] += customers
+            continue
+
+        bucket = totals[outreach]
+        bucket["customers"] += customers
+        bucket["fit_sum"] += customers * response.accessibility_fit
+        if response.direction == PromoPriceDirection.UP:
+            bucket["up_convert"] += customers
+        elif response.direction == PromoPriceDirection.DOWN:
+            bucket["down_convert"] += customers
+        elif response.primary_sku == outreach:
+            bucket["direct"] += customers
+
+    result: dict[str, dict[str, int | float]] = {}
+    for product, bucket in totals.items():
+        customers = int(bucket["customers"])
+        result[product] = {
+            "customers": customers,
+            "direct": int(bucket["direct"]),
+            "up_convert": int(bucket["up_convert"]),
+            "down_convert": int(bucket["down_convert"]),
+            "segment_in": int(bucket["segment_in"]),
+            "avg_accessibility_fit": round(bucket["fit_sum"] / customers, 3) if customers else 0.0,
+        }
+    return result, unassigned
+
+
+def aggregate_hybrid_promo_coverage(
+    cohort_rows: list[dict],
+) -> dict[str, dict[str, int | float]]:
+    """Backward-compatible alias — returns SKU totals only (legacy hybrid callers)."""
+    skus, _ = aggregate_conservative_promo_coverage(cohort_rows)
+    return skus
 
 
 _BAND_TO_PP_CATEGORY: dict[str, str] = {

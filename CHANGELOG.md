@@ -2,6 +2,42 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.1.0] — 2026-07-23
+
+### Summary
+
+ORION navigation UX, full User Management (RBAC, per-menu access, password reset on save, user delete), buyer upload/GAP, commercial simulator forecast, and local dev stability improvements. Development status documented in **Volume 31**.
+
+### Features
+
+- ORION primary navigation labels and Administration menu order (SKU Catalog → … → Platform Health)
+- Login flow with JWT; `/auth/me` returns effective modules and allowed menu hrefs
+- User Management overhaul: role/menu preview, Save/Cancel, optional new password on save, user delete API
+- Per-user custom menu access via `allowed_modules` (migration `0018`)
+- Buyer Upload & GAP page and backend (`0016`)
+- Commercial Simulator forecast persistence (`0017`)
+- `DELETE /api/v1/admin/users/{email}` with self-delete and last-admin guards
+- `scripts/dev_foreground.sh` + `Start CIOS.command` for stable local dev; backend `--reload`
+
+### Bug Fixes
+
+- Sidebar: Platform Health no longer highlighted on `/admin/users` and other `/admin/*` routes
+- User table email/name inputs retain focus while typing (stable DataTable columns)
+- Read Only users: suppress upload-list forbidden banner when upload permission absent
+- Replace non-working `window.prompt` password reset with Role menu preview password field
+
+### Documentation
+
+- **Volume 31** — [31_Development_Status_Report.md](./docs/31_Development_Status_Report.md) (개발 현황 · v1.1.0 baseline)
+- Root [`VERSION`](./VERSION) file as single version source
+
+### Known Issues
+
+- Local dev requires PostgreSQL, optional upload worker, and keeping the CIOS Terminal window open
+- Frontend automated E2E tests not yet implemented
+- Multiple overlapping dev startup scripts (consolidation planned — Volume 31 §7)
+- Upload cancel API still not implemented (carried from v1.0.1)
+
 ## [1.0.1] — 2026-07-08
 
 ### Summary

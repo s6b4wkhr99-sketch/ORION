@@ -1,6 +1,8 @@
 export const APP_NAME = "ORION";
 export const APP_TAGLINE = "Campaign Decision Intelligence";
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.1.0";
+
+import { hasModule, type PermissionModule } from "@/lib/access-control";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "";
 
@@ -10,30 +12,34 @@ export type NavItem = {
   label: string;
   icon: string;
   screenId?: string;
+  /** RBAC module — user must have this permission to see the item. */
+  permissionModule?: import("@/lib/access-control").PermissionModule;
   children?: NavItem[];
 };
 
 /** Flat primary navigation — order is mandatory per ORION Constitution + mockup */
 export const ORION_PRIMARY_NAV: NavItem[] = [
-  { href: "/mission-control", label: "Mission Control", icon: "Home", screenId: "SCR-001" },
-  { href: "/market-intelligence", label: "Market Intelligence", icon: "Map", screenId: "SCR-003" },
-  { href: "/metro-intelligence", label: "Metro Intelligence", icon: "Compass" },
-  { href: "/opportunities", label: "Opportunity Finder", icon: "Crosshair", screenId: "SCR-002" },
-  { href: "/customers", label: "Customer Database", icon: "Database" },
-  { href: "/recommendations", label: "Recommendation Center", icon: "Sparkles", screenId: "SCR-004" },
-  { href: "/campaigns", label: "Campaign Intelligence", icon: "BarChart3", screenId: "SCR-006" },
-  { href: "/learning", label: "Learning Center", icon: "GraduationCap", screenId: "SCR-007" },
+  { href: "/mission-control", label: "Mission Control", icon: "Home", screenId: "SCR-001", permissionModule: "dashboard" },
+  { href: "/market-intelligence", label: "Market Intelligence", icon: "Map", screenId: "SCR-003", permissionModule: "customer_intelligence" },
+  { href: "/metro-intelligence", label: "Metro Intelligence", icon: "Compass", permissionModule: "customer_intelligence" },
+  { href: "/opportunities", label: "Opportunity Finder", icon: "Crosshair", screenId: "SCR-002", permissionModule: "customer_intelligence" },
+  { href: "/customers", label: "Customer Database", icon: "Database", permissionModule: "customer_intelligence" },
+  { href: "/recommendations", label: "Recommendation Center", icon: "Sparkles", screenId: "SCR-004", permissionModule: "campaign" },
+  { href: "/campaigns", label: "Campaign Intelligence", icon: "BarChart3", screenId: "SCR-006", permissionModule: "campaign" },
+  { href: "/learning", label: "Learning Center", icon: "GraduationCap", screenId: "SCR-007", permissionModule: "campaign" },
   {
     href: "/admin",
     label: "Administration",
     icon: "Settings",
     screenId: "SCR-008",
     children: [
-      { href: "/admin", label: "Platform Health", icon: "Activity" },
-      { href: "/admin/catalog", label: "SKU Catalog", icon: "Package" },
-      { href: "/import", label: "Upload Center", icon: "Upload" },
-      { href: "/export", label: "Audience Export", icon: "Download", screenId: "SCR-005" },
-      { href: "/commercial-simulator", label: "Commercial Simulator", icon: "Calculator" },
+      { href: "/admin/catalog", label: "SKU Catalog", icon: "Package", permissionModule: "settings" },
+      { href: "/import", label: "Upload Center", icon: "Upload", permissionModule: "upload" },
+      { href: "/export", label: "Audience Export", icon: "Download", screenId: "SCR-005", permissionModule: "export" },
+      { href: "/buyer-import", label: "Buyer Upload & GAP", icon: "ShoppingCart", permissionModule: "report_import" },
+      { href: "/admin/users", label: "User Management", icon: "Users", permissionModule: "user_administration" },
+      { href: "/commercial-simulator", label: "Commercial Simulator", icon: "Calculator", permissionModule: "forecast" },
+      { href: "/admin", label: "Platform Health", icon: "Activity", permissionModule: "settings" },
     ],
   },
 ];
@@ -49,12 +55,62 @@ export const SHOW_CUSTOMER_DATABASE = process.env.NEXT_PUBLIC_SHOW_CUSTOMER_DATA
 
 const HIDDEN_WHEN_ANALYSIS_ONLY = new Set(["/recommendations", "/campaigns", "/learning"]);
 
-export function getPrimaryNav(): NavItem[] {
+export function filterNavByAllowedMenus(items: NavItem[], allowedMenus: string[]): NavItem[] {
+  const allowed = new Set(allowedMenus);
+  return items.flatMap((item) => {
+    if (item.children?.length) {
+      const children = filterNavByAllowedMenus(item.children, allowedMenus);
+      if (!children.length) return [];
+      return [{ ...item, children }];
+    }
+    if (!allowed.has(item.href)) return [];
+    return [item];
+  });
+}
+
+export function filterNavByModules(items: NavItem[], modules: PermissionModule[]): NavItem[] {
+  const allowed = new Set(modules);
+  return items.flatMap((item) => {
+    if (item.children?.length) {
+      const children = filterNavByModules(item.children, modules);
+      if (!children.length) return [];
+      return [{ ...item, children }];
+    }
+    if (item.permissionModule && !allowed.has(item.permissionModule as PermissionModule)) {
+      return [];
+    }
+    return [item];
+  });
+}
+
+export function filterNavByRole(items: NavItem[], role: string): NavItem[] {
+  return items.flatMap((item) => {
+    if (item.children?.length) {
+      const children = filterNavByRole(item.children, role);
+      if (!children.length) return [];
+      return [{ ...item, children }];
+    }
+    if (item.permissionModule && !hasModule(role, item.permissionModule as PermissionModule)) {
+      return [];
+    }
+    return [item];
+  });
+}
+
+export function getPrimaryNav(
+  role = "System Administrator",
+  modules?: PermissionModule[],
+  allowedMenus?: string[] | null,
+): NavItem[] {
   let nav = SHOW_CAMPAIGN_MODULES ? ORION_PRIMARY_NAV : ORION_PRIMARY_NAV.filter((item) => !HIDDEN_WHEN_ANALYSIS_ONLY.has(item.href));
   if (!SHOW_CUSTOMER_DATABASE) {
     nav = nav.filter((item) => item.href !== "/customers");
   }
-  return nav;
+  if (allowedMenus?.length && allowedMenus[0]?.startsWith("/")) {
+    return filterNavByAllowedMenus(nav, allowedMenus);
+  }
+  if (modules?.length) return filterNavByModules(nav, modules);
+  return filterNavByRole(nav, role);
 }
 
 export const CAMPAIGN_MODULE_ROUTES = [

@@ -2,7 +2,7 @@
  * Client-side dashboard cache — single version bumps invalidate all CIOS menu caches.
  * Keep in sync with backend EXECUTIVE_DASHBOARD_BUILD_VERSION after policy changes.
  */
-export const DASHBOARD_CLIENT_CACHE_VERSION = "2026-07-m10-choropleth-geo";
+export const DASHBOARD_CLIENT_CACHE_VERSION = "2026-07-conservative-promo-reach-v4";
 
 const VERSION_KEY = "cios:dashboard-cache-version";
 const KEY_PREFIX = `cios:v${DASHBOARD_CLIENT_CACHE_VERSION}:`;

@@ -9,12 +9,11 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.mapping.data_dictionary import EXPORT_VALUE_RESOLVERS
 from app.models.customer import Customer, CustomerIntelligence
 from app.models.export import ExportJob
 from app.providers.audit import log_provider_audit
 from app.providers.base import ExportContext
-from app.providers.export_builder import get_export_headers, resolve_export_value
+from app.providers.export_builder import build_export_row_dict, get_export_headers
 from app.providers.export_validation import ExportValidationError, validate_export
 
 EXPORT_BATCH_SIZE = 5000
@@ -72,21 +71,15 @@ def _write_export_csv(
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         for customer, intel in _iter_export_rows(db, **filters):
-            row_values: dict[str, str] = {}
-            for field, label in headers:
-                if field == "campaign_id":
-                    row_values[label] = campaign_id
-                elif field == "campaign_name":
-                    row_values[label] = campaign_name
-                elif field == "ceragem_segment":
-                    row_values[label] = intel.ceragem_segment or intel.prizm_proxy_segment or ""
-                elif field.startswith("intel_"):
-                    intel_field = field.replace("intel_", "")
-                    resolver = EXPORT_VALUE_RESOLVERS.get(intel_field)
-                    row_values[label] = resolver(customer, intel) if resolver else ""
-                else:
-                    row_values[label] = resolve_export_value(field, customer, intel)
-            writer.writerow(row_values)
+            writer.writerow(
+                build_export_row_dict(
+                    headers,
+                    campaign_id=campaign_id,
+                    campaign_name=campaign_name,
+                    customer=customer,
+                    intel=intel,
+                )
+            )
             customer_count += 1
 
     duration_ms = round((time.perf_counter() - started) * 1000, 2)

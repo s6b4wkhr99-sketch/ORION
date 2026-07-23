@@ -70,9 +70,10 @@ All ORION specifications live in **[`../../../ORION Project/ORION/`](../../../OR
 | 28.1 | [28.1_Hybrid_Operations_Plan.md](./28.1_Hybrid_Operations_Plan.md) | Hybrid Operations Plan |
 | 29 | [29_Intelligence_Modeling_Guide.md](./29_Intelligence_Modeling_Guide.md) | **Intelligence Modeling Guide (재구축 기준 · Mission Control 매핑)** |
 | 30 | [30_Intelligence_Logic_and_Formulas.md](./30_Intelligence_Logic_and_Formulas.md) | **Intelligence Logic & Formulas (로직·수식·도표 상세)** |
+| 31 | [31_Development_Status_Report.md](./31_Development_Status_Report.md) | **Development Status Report (개발 현황 · v1.1.0)** |
 
 > **Live README:** Repository root [`README.md`](../README.md)  
-> **As-Built:** Volume 27 (v1.0.1) · **Intelligence rebuild baseline:** Volume 29 · **Formulas reference:** Volume 30  
+> **As-Built:** Volume 27 (v1.0.1) · **Current status:** Volume 31 (v1.1.0) · **Intelligence rebuild baseline:** Volume 29 · **Formulas reference:** Volume 30  
 > **Operations:** Volume 28.1
 
 ## API Base URL

@@ -2,7 +2,7 @@
 
 from app.commercial.catalog import product_by_code
 from app.commercial.engine import cap_promotion, default_promotion_amount
-from app.mapping.data_dictionary import EXPORT_VALUE_RESOLVERS, INTELLIGENCE_EXPORT_FIELDS
+from app.mapping.data_dictionary import EXPORT_VALUE_RESOLVERS, INTELLIGENCE_EXPORT_FIELDS, export_field_value
 from app.models.customer import Customer, CustomerIntelligence
 from app.models.export import ExportTemplate
 from app.reference.registry import ACTIVE_STANDING_PROMOTIONS
@@ -26,6 +26,7 @@ def get_export_headers(db: Session, provider: str) -> list[tuple[str, str]]:
     headers = [(t.field, t.target_name) for t in templates]
     for field, label in INTELLIGENCE_EXPORT_FIELDS:
         headers.append((f"intel_{field}", label))
+    headers.append(("target_sku", "Target SKU"))
     headers.extend([
         ("promo_code", "Promo Code"),
         ("recommended_promotion", "Recommended Promotion"),
@@ -38,6 +39,8 @@ def get_export_headers(db: Session, provider: str) -> list[tuple[str, str]]:
 
 
 def resolve_export_value(field: str, customer: Customer, intel: CustomerIntelligence) -> str:
+    if field == "target_sku":
+        return intel.recommended_product or ""
     if field == "promo_code":
         if intel.promo_code:
             return intel.promo_code
@@ -64,3 +67,26 @@ def resolve_export_value(field: str, customer: Customer, intel: CustomerIntellig
     if resolver:
         return resolver(customer, intel)
     return ""
+
+
+def build_export_row_dict(
+    headers: list[tuple[str, str]],
+    *,
+    campaign_id: str,
+    campaign_name: str,
+    customer: Customer,
+    intel: CustomerIntelligence,
+) -> dict[str, str]:
+    row_values: dict[str, str] = {}
+    for field, label in headers:
+        if field == "campaign_id":
+            row_values[label] = campaign_id
+        elif field == "campaign_name":
+            row_values[label] = campaign_name
+        elif field == "ceragem_segment":
+            row_values[label] = intel.ceragem_segment or intel.prizm_proxy_segment or ""
+        elif field.startswith("intel_"):
+            row_values[label] = export_field_value(field, customer, intel)
+        else:
+            row_values[label] = resolve_export_value(field, customer, intel)
+    return row_values

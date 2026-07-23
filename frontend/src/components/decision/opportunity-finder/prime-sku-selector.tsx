@@ -1,6 +1,7 @@
 "use client";
 
 import { PRODUCT_OPTIONS } from "@/lib/config";
+import { promoStyleForCode, uniquePromoCodes } from "@/lib/promo-chip-styles";
 import type { StandingPromotionRow } from "@/lib/standing-promotions";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,7 @@ export function PrimeSkuSelector({
   activePromotions = [],
 }: PrimeSkuSelectorProps) {
   const promoBySku = new Map(activePromotions.map((row) => [row.product, row]));
+  const promoCodes = uniquePromoCodes(activePromotions.map((row) => row.promo_code));
 
   const toggleAdditional = (sku: string) => {
     if (sku === mainSku) return;
@@ -41,13 +43,16 @@ export function PrimeSkuSelector({
 
       {activePromotions.length ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-[var(--cios-secondary)]">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full border border-amber-400 bg-amber-50" />
-            Active standing promotion
-          </span>
-          <span>
-            {activePromotions.map((row) => `${row.product} (${row.promo_code})`).join(" · ")}
-          </span>
+          {activePromotions.map((row) => {
+            const style = promoStyleForCode(row.promo_code, promoCodes);
+            return (
+              <span key={row.product} className="inline-flex items-center gap-1.5">
+                <span className={cn("inline-block h-2.5 w-2.5 rounded-full border", style.legendDot)} />
+                {row.product} · {row.promo_code}
+                {row.default_promotion_pct != null ? ` (${row.default_promotion_pct}%)` : ""}
+              </span>
+            );
+          })}
         </div>
       ) : null}
 
@@ -61,6 +66,7 @@ export function PrimeSkuSelector({
               active={mainSku === sku}
               tone="main"
               promo={promoBySku.get(sku)}
+              promoCodes={promoCodes}
               onClick={() => {
                 onMainChange(sku);
                 onAdditionalChange(additionalSkus.filter((code) => code !== sku));
@@ -80,6 +86,7 @@ export function PrimeSkuSelector({
               active={additionalSkus.includes(sku)}
               tone="add"
               promo={promoBySku.get(sku)}
+              promoCodes={promoCodes}
               onClick={() => toggleAdditional(sku)}
             />
           ))}
@@ -108,10 +115,7 @@ export function PrimeSkuSelector({
                     </td>
                     <td className="py-2 pr-3">
                       {promo ? (
-                        <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-900">
-                          {promo.promo_code}
-                          {promo.default_promotion_pct != null ? ` · ${promo.default_promotion_pct}%` : ""}
-                        </span>
+                        <PromoBadge promo={promo} promoCodes={promoCodes} />
                       ) : (
                         "—"
                       )}
@@ -129,20 +133,40 @@ export function PrimeSkuSelector({
   );
 }
 
+function PromoBadge({ promo, promoCodes }: { promo: StandingPromotionRow; promoCodes: string[] }) {
+  const style = promoStyleForCode(promo.promo_code, promoCodes);
+  return (
+    <span
+      className={cn(
+        "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        style.border,
+        style.bg,
+        style.text,
+      )}
+    >
+      {promo.promo_code}
+      {promo.default_promotion_pct != null ? ` · ${promo.default_promotion_pct}%` : ""}
+    </span>
+  );
+}
+
 function SkuChip({
   label,
   active,
   tone,
   promo,
+  promoCodes,
   onClick,
 }: {
   label: string;
   active: boolean;
   tone: "main" | "add";
   promo?: StandingPromotionRow;
+  promoCodes: string[];
   onClick: () => void;
 }) {
   const hasPromo = Boolean(promo?.promo_code);
+  const promoStyle = hasPromo ? promoStyleForCode(promo!.promo_code, promoCodes) : null;
   const promoLabel =
     promo?.promo_code && promo.default_promotion_pct != null
       ? `${promo.promo_code} · ${promo.default_promotion_pct}% off`
@@ -157,13 +181,15 @@ function SkuChip({
         "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
         active && tone === "main" && "border-indigo-600 bg-indigo-600 text-white",
         active && tone === "add" && "border-teal-600 bg-teal-50 text-teal-800",
-        !active && hasPromo && "border-amber-400 bg-amber-50 text-amber-950 hover:border-amber-500",
+        !active && hasPromo && promoStyle && cn(promoStyle.border, promoStyle.bg, promoStyle.text, "hover:opacity-90"),
         !active && !hasPromo && "border-gray-200 bg-white text-gray-700 hover:border-indigo-300",
-        active && hasPromo && "ring-2 ring-amber-400 ring-offset-1",
+        active && hasPromo && promoStyle && cn("ring-2 ring-offset-1", promoStyle.ring),
       )}
     >
       <span className="inline-flex items-center gap-1.5">
-        {hasPromo ? <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-amber-300" : "bg-amber-500")} /> : null}
+        {hasPromo && promoStyle ? (
+          <span className={cn("h-1.5 w-1.5 rounded-full", active ? "bg-white/80" : promoStyle.dot)} />
+        ) : null}
         {label}
       </span>
     </button>

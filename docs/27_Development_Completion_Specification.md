@@ -3,6 +3,7 @@
 **Version:** 1.0.1  
 **Status:** As-Built (구현 완료 기준)  
 **Last Updated:** 2026-07-08  
+**Latest status:** [Volume 31 — Development Status Report](./31_Development_Status_Report.md) (v1.1.0, 2026-07-23)
 **Audience:** 개발자, 운영자, QA, 프로젝트 관리자
 
 ---

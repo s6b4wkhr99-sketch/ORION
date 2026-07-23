@@ -4,10 +4,22 @@
 ROOT := $(CURDIR)/
 
 postgres-up:
-	docker compose -f "$(ROOT)docker-compose.postgres.yml" up -d
+	@if command -v docker >/dev/null 2>&1 || [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then \
+		docker compose -f "$(ROOT)docker-compose.postgres.yml" up -d; \
+	elif PATH="/opt/homebrew/opt/postgresql@16/bin:$$PATH" pg_isready -h 127.0.0.1 -p 5432 >/dev/null 2>&1; then \
+		echo "PostgreSQL already running on 127.0.0.1:5432 (native — Docker not required)"; \
+	else \
+		echo "Docker not found. Starting native PostgreSQL via Homebrew..."; \
+		bash "$(ROOT)scripts/setup_2_5m_postgres.sh"; \
+	fi
 
 postgres-down:
-	docker compose -f "$(ROOT)docker-compose.postgres.yml" down
+	@if command -v docker >/dev/null 2>&1 || [ -x /Applications/Docker.app/Contents/Resources/bin/docker ]; then \
+		docker compose -f "$(ROOT)docker-compose.postgres.yml" down; \
+	else \
+		echo "Docker not installed — native PostgreSQL left running."; \
+		echo "To stop Homebrew Postgres: brew services stop postgresql@16"; \
+	fi
 
 setup-2_5m:
 	bash "$(ROOT)scripts/setup_2_5m_postgres.sh"
@@ -53,6 +65,9 @@ dev-status:
 
 dev-restart:
 	bash "$(ROOT)scripts/dev_daemon.sh" restart
+
+frontend-build:
+	cd "$(ROOT)frontend" && npm run build
 
 test-phase3:
 	cd "$(ROOT)backend" && . .venv/bin/activate && DATABASE_URL=$${DATABASE_URL:-postgresql+psycopg2://cios:cios_dev_password@127.0.0.1:5432/cios} python tests/test_phase3_postgres.py

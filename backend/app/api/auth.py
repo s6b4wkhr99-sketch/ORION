@@ -38,7 +38,8 @@ def _fallback_user(email: str, password: str) -> dict | None:
 
 
 def authenticate_user(db: Session, email: str, password: str) -> dict | None:
-    user = db.query(User).filter(User.email == email).first()
+    normalized_email = email.strip().lower()
+    user = db.query(User).filter(User.email == normalized_email).first()
     if user:
         if not user.is_active:
             return None
@@ -50,12 +51,12 @@ def authenticate_user(db: Session, email: str, password: str) -> dict | None:
             db.commit()
             return {"email": user.email, "role": user.role, "name": user.name}
         record_failed_login(db, email)
-        record_audit(db, action="login_failed", user_id=email, status="failure")
+        record_audit(db, action="login_failed", user_id=normalized_email, status="failure")
         return None
-    legacy = _fallback_user(email, password)
+    legacy = _fallback_user(normalized_email, password)
     if legacy:
         return legacy
-    record_audit(db, action="login_failed", user_id=email, status="failure")
+    record_audit(db, action="login_failed", user_id=normalized_email, status="failure")
     return None
 
 

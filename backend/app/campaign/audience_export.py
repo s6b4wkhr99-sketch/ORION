@@ -22,7 +22,7 @@ from app.campaign.opportunity_simulate import (
 from app.config import settings
 from app.models.export import AudienceExportRecommendation
 from app.models.customer import Customer, CustomerIntelligence
-from app.providers.export_builder import get_export_headers, resolve_export_value
+from app.providers.export_builder import build_export_row_dict, get_export_headers
 from app.utils.timezone import now_app
 
 EXPORT_BATCH_SIZE = 5000
@@ -168,19 +168,13 @@ def _build_export_row(
     customer: Customer,
     intel: CustomerIntelligence,
 ) -> dict[str, str]:
-    row_values: dict[str, str] = {}
-    for field, label in headers:
-        if field == "campaign_id":
-            row_values[label] = campaign_id
-        elif field == "campaign_name":
-            row_values[label] = campaign_name
-        elif field == "ceragem_segment":
-            row_values[label] = intel.ceragem_segment or intel.prizm_proxy_segment or ""
-        elif field.startswith("intel_"):
-            row_values[label] = ""
-        else:
-            row_values[label] = resolve_export_value(field, customer, intel)
-    return row_values
+    return build_export_row_dict(
+        headers,
+        campaign_id=campaign_id,
+        campaign_name=campaign_name,
+        customer=customer,
+        intel=intel,
+    )
 
 
 def _iter_audience_csv_rows(db: Session, rec: AudienceExportRecommendation) -> Iterator[str]:

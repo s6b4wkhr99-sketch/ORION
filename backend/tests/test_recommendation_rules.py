@@ -113,7 +113,8 @@ def test_caregiving_medium_lifestyle_steps_to_m6s_with_promo():
             sleep_geo_boost=0.30,
         )
     )
-    assert result["recommended_product"] == "Pause M6s"
+    # GAP calibration v1 — value wellness cohorts anchor to Master S4 (buyer profile alignment).
+    assert result["recommended_product"] == "Master S4"
 
 
 def test_lower_income_wellness_standard_m4_without_promo_expansion(monkeypatch):
@@ -130,7 +131,7 @@ def test_lower_income_wellness_standard_m4_without_promo_expansion(monkeypatch):
             zip_income_tier="Mid",
         )
     )
-    assert result["recommended_product"] in {"Pause M4", "Pause M6s"}
+    assert result["recommended_product"] in {"Master S4", "Pause M4", "Pause M6s"}
 
 
 def test_m4_expands_to_s4_when_s4_promo_active(monkeypatch):

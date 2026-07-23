@@ -11,7 +11,7 @@ from threading import Event, Lock
 from app.config import settings
 
 # Bump after promo policy / coverage logic changes so all dashboard namespaces rebuild.
-DASHBOARD_BUILD_VERSION = "2026-07-promo-price-response"
+DASHBOARD_BUILD_VERSION = "2026-07-conservative-promo-reach-v4"
 
 _CACHE: dict[str, tuple[float, dict]] = {}
 _LOCK = Lock()
@@ -129,7 +129,7 @@ def _cache_hit_payload(key: str) -> dict | None:
 def cached_dashboard(namespace: str, scope: str, builder) -> dict:
     if not settings.dashboard_cache_enabled:
         return builder()
-    key = f"{_cache_generation()}:{namespace}:{scope}"
+    key = f"{DASHBOARD_BUILD_VERSION}:{_cache_generation()}:{namespace}:{scope}"
     hit = _cache_hit_payload(key)
     if hit is not None:
         return hit

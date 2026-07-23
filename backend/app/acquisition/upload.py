@@ -54,10 +54,24 @@ def _safe_str(value) -> str | None:
     return text or None
 
 
+def resolve_storage_path(relative_or_absolute: str) -> str:
+    """Resolve upload/export paths relative to the backend root (stable across CWD)."""
+    if os.path.isabs(relative_or_absolute):
+        return relative_or_absolute
+    backend_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(backend_root, relative_or_absolute)
+
+
 def _load_dataframe(file_path: str, file_type: str) -> pd.DataFrame:
+    resolved = resolve_storage_path(file_path) if not os.path.isabs(file_path) else file_path
+    if not os.path.isfile(resolved):
+        raise UploadValidationError(
+            f"Uploaded file not found on server: {resolved}",
+            details={"file_path": resolved},
+        )
     if file_type == "csv":
-        return pd.read_csv(file_path, dtype=str, keep_default_na=False)
-    return pd.read_excel(file_path, dtype=str, keep_default_na=False)
+        return pd.read_csv(resolved, dtype=str, keep_default_na=False)
+    return pd.read_excel(resolved, dtype=str, keep_default_na=False)
 
 
 def _get_zip_ref(db: Session, zip_code: str | None, cache: dict[str, dict] | None = None) -> dict | None:
@@ -252,6 +266,7 @@ def process_upload(
             file_type=file_type,
             uploaded_by=uploaded_by,
             provider="customer_list",
+            dataset_type="prospect",
             status="processing",
         )
         db.add(upload)
@@ -488,11 +503,12 @@ def process_upload(
 
 def save_upload_file(content: bytes, filename: str) -> str:
     now = datetime.utcnow()
-    month_dir = os.path.join(settings.upload_dir, now.strftime("%Y"), now.strftime("%m"))
+    upload_root = resolve_storage_path(settings.upload_dir)
+    month_dir = os.path.join(upload_root, now.strftime("%Y"), now.strftime("%m"))
     os.makedirs(month_dir, exist_ok=True)
     ext = os.path.splitext(filename)[1]
     stored_name = f"{uuid.uuid4()}{ext}"
-    path = os.path.join(month_dir, stored_name)
+    path = os.path.abspath(os.path.join(month_dir, stored_name))
     with open(path, "wb") as f:
         f.write(content)
     return path

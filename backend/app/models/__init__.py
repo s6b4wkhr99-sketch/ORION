@@ -8,7 +8,7 @@ from app.models.auto_mapping import (
     ProviderUploadTemplate,
 )
 from app.models.customer import Customer, CustomerDatalogix, CustomerIntelligence
-from app.models.commercial import CommercialCatalogVersion
+from app.models.commercial import CommercialCatalogVersion, CommercialSimulatorForecast
 from app.models.zip import ZipIntelligence
 from app.models.campaign import Campaign, CampaignProduct, CampaignReportUpload, CampaignSegment, CampaignState
 from app.models.learning import CampaignLearning, LearningCampaign
@@ -44,6 +44,7 @@ __all__ = [
     "CustomerDatalogix",
     "CustomerIntelligence",
     "CommercialCatalogVersion",
+    "CommercialSimulatorForecast",
     "IntelligenceVersion",
     "IntelligenceTrace",
     "UploadRollup",

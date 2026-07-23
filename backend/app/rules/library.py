@@ -54,7 +54,7 @@ RULES: tuple[BusinessRule, ...] = (
         inputs=("uploaded_file",),
         outputs=("upload_accepted", "upload_rejected"),
         dependencies=("Upload Module",),
-        execution_logic="Maximum size 100 MB.",
+        execution_logic="Maximum size 500 MB.",
         acceptance_criteria="Files exceeding the limit shall not be processed.",
         implementation_refs=("upload.validate_file_size",),
     ),

@@ -31,6 +31,42 @@ export function formatPercent(value: number | null | undefined, digits = 2): str
   return `${(value * 100).toFixed(digits)}%`;
 }
 
+/** Conversion rates (0–1 decimal) often need extra precision below 1%. */
+export function formatConversionRate(value: number | null | undefined): string {
+  if (value == null) return "—";
+  return formatConversionPercentValue(value * 100);
+}
+
+/** Format a percent magnitude (0.00025 → "0.00025%"). */
+export function formatConversionPercentValue(percent: number | null | undefined): string {
+  if (percent == null) return "—";
+  if (percent >= 1) return `${percent.toFixed(2)}%`;
+  const formatted = percent.toFixed(6).replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+  return `${formatted}%`;
+}
+
+/** UI percent input (0.00025 = 0.00025%) → decimal rate for API (0.0000025). */
+export function parseConversionRateInput(value: string): number | undefined {
+  const parsed = parseOptionalDecimal(value);
+  if (parsed == null) return undefined;
+  return parsed / 100;
+}
+
+/** Decimal rate from API → percent magnitude for UI display/input. */
+export function conversionRateToPercentInput(decimalRate: number | null | undefined): string {
+  if (decimalRate == null) return "";
+  const percent = decimalRate * 100;
+  if (percent >= 1) return percent.toFixed(2);
+  return percent.toFixed(6).replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.0+$/, "");
+}
+
+export function parseOptionalDecimal(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 /** Predicted conversion is a rate (0–1), not expected order count. */
 export function resolvePredictedConversionRate(data: {
   conversion_rate?: number | null;

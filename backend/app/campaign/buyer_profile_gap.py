@@ -42,6 +42,202 @@ _STATE_IN_TEXT = re.compile(
     r"\b(" + "|".join(sorted(US_STATES, key=len, reverse=True)) + r")\b"
 )
 
+_STATE_NAME_TO_CODE = {
+    "ALABAMA": "AL",
+    "ALASKA": "AK",
+    "ARIZONA": "AZ",
+    "ARKANSAS": "AR",
+    "CALIFORNIA": "CA",
+    "COLORADO": "CO",
+    "CONNECTICUT": "CT",
+    "DELAWARE": "DE",
+    "FLORIDA": "FL",
+    "GEORGIA": "GA",
+    "HAWAII": "HI",
+    "IDAHO": "ID",
+    "ILLINOIS": "IL",
+    "INDIANA": "IN",
+    "IOWA": "IA",
+    "KANSAS": "KS",
+    "KENTUCKY": "KY",
+    "LOUISIANA": "LA",
+    "MAINE": "ME",
+    "MARYLAND": "MD",
+    "MASSACHUSETTS": "MA",
+    "MICHIGAN": "MI",
+    "MINNESOTA": "MN",
+    "MISSISSIPPI": "MS",
+    "MISSOURI": "MO",
+    "MONTANA": "MT",
+    "NEBRASKA": "NE",
+    "NEVADA": "NV",
+    "NEW HAMPSHIRE": "NH",
+    "NEW JERSEY": "NJ",
+    "NEW MEXICO": "NM",
+    "NEW YORK": "NY",
+    "NORTH CAROLINA": "NC",
+    "NORTH DAKOTA": "ND",
+    "OHIO": "OH",
+    "OKLAHOMA": "OK",
+    "OREGON": "OR",
+    "PENNSYLVANIA": "PA",
+    "RHODE ISLAND": "RI",
+    "SOUTH CAROLINA": "SC",
+    "SOUTH DAKOTA": "SD",
+    "TENNESSEE": "TN",
+    "TEXAS": "TX",
+    "UTAH": "UT",
+    "VERMONT": "VT",
+    "VIRGINIA": "VA",
+    "WASHINGTON": "WA",
+    "WEST VIRGINIA": "WV",
+    "WISCONSIN": "WI",
+    "WYOMING": "WY",
+    "DISTRICT OF COLUMBIA": "DC",
+}
+
+# Legacy dealer LOCATION free-text → state (Ceragem US concentration).
+_CITY_STATE_HINTS = {
+    "LOS ANGELES": "CA",
+    "SAN DIEGO": "CA",
+    "SAN FRANCISCO": "CA",
+    "SAN JOSE": "CA",
+    "IRVINE": "CA",
+    "TORRANCE": "CA",
+    "FULLERTON": "CA",
+    "SANTA ANA": "CA",
+    "LAS VEGAS": "NV",
+    "PHOENIX": "AZ",
+    "DALLAS": "TX",
+    "HOUSTON": "TX",
+    "AUSTIN": "TX",
+    "MIAMI": "FL",
+    "ORLANDO": "FL",
+    "NEW YORK": "NY",
+    "BROOKLYN": "NY",
+    "CHICAGO": "IL",
+    "SEATTLE": "WA",
+    "PORTLAND": "OR",
+    "DENVER": "CO",
+    "ATLANTA": "GA",
+}
+
+_CA_PROVINCES = {
+    "ON": "ON",
+    "ONTARIO": "ON",
+    "BC": "BC",
+    "BRITISH COLUMBIA": "BC",
+    "AB": "AB",
+    "ALBERTA": "AB",
+    "QC": "QC",
+    "QUEBEC": "QC",
+}
+
+# Legacy dealer LOCATION column = store/mall name (not state).
+_LEGACY_STORE_STATE: dict[str, str] = {
+    "BREA MALL": "CA",
+    "BREA": "CA",
+    "KOREATOWN PLAZA": "CA",
+    "LOS CERRITOS CENTER": "CA",
+    "WESTFIELD CENTURY CITY": "CA",
+    "WEST HOLLYWOOD LOUNGE": "CA",
+    "DEL AMO": "CA",
+    "DEL AMO FASHION CENTER": "CA",
+    "FULLERTON": "CA",
+    "MISSION VIEJO": "CA",
+    "WESTFIELD TOPANGA": "CA",
+    "SAN JOSE": "CA",
+    "THE OAKS": "CA",
+    "DALLAS": "TX",
+    "MESA": "AZ",
+    "PALISADES PARK": "NJ",
+    "GLENVIEW": "IL",
+    "NILES": "IL",
+    "DULUTH": "GA",
+    "ONLINE": "OTHER",
+    "ON LINE": "OTHER",
+    "OTHERS": "OTHER",
+    "INFOMERCIAL": "OTHER",
+    "TV INFOMERCIAL": "OTHER",
+}
+
+_ADDRESS_STATE_RE = re.compile(
+    r",\s*(" + "|".join(sorted(US_STATES, key=len, reverse=True)) + r")\s+\d{5}",
+    re.I,
+)
+
+
+def parse_state_from_address(address: str | None) -> str | None:
+    """Extract US state from legacy ADDRESS line e.g. 'Brea, CA 92821'."""
+    text = (address or "").strip()
+    if not text:
+        return None
+    match = _ADDRESS_STATE_RE.search(text.upper())
+    if match:
+        return match.group(1).upper()
+    # trailing ", CA" without zip
+    for code in sorted(US_STATES, key=len, reverse=True):
+        if re.search(rf",\s*{code}\s*$", text, re.I):
+            return code
+    return None
+
+
+def parse_legacy_location(location: str | None, address: str | None = None) -> str:
+    """Resolve state from legacy store LOCATION + customer ADDRESS."""
+    from_address = parse_state_from_address(address)
+    if from_address:
+        return from_address
+    loc = (location or "").strip().upper()
+    if not loc:
+        return "OTHER"
+    if loc in _LEGACY_STORE_STATE:
+        return _LEGACY_STORE_STATE[loc]
+    for store, code in _LEGACY_STORE_STATE.items():
+        if store in loc:
+            return code
+    return parse_us_state(location, source="legacy")
+
+
+def parse_us_state(raw: str | None, *, source: str) -> str:
+    text = (raw or "").strip().upper()
+    if not text:
+        return "OTHER"
+
+    # "CA - Los Angeles", "CA/LA", "CA, US"
+    prefix = re.match(r"^([A-Z]{2})\s*[-/,]", text)
+    if prefix and prefix.group(1) in US_STATES:
+        return prefix.group(1)
+
+    match = _STATE_IN_TEXT.search(text)
+    if match:
+        return match.group(1)
+
+    for name, code in sorted(_STATE_NAME_TO_CODE.items(), key=lambda x: -len(x[0])):
+        if name in text:
+            return code
+
+    for city, code in _CITY_STATE_HINTS.items():
+        if city in text:
+            return code
+
+    if source == "legacy":
+        if text.startswith("CA") or " CALIF" in text or "CALIFORNIA" in text:
+            return "CA"
+        for prov, code in _CA_PROVINCES.items():
+            if prov in text.split():
+                return code
+        # Single token legacy codes e.g. "WE" (western region shorthand in some exports)
+        token = text.split()[0][:2] if text.split() else text[:2]
+        if token in US_STATES:
+            return token
+
+    code = text[:2] if len(text) >= 2 else text
+    if code in US_STATES:
+        return code
+    if code in _CA_PROVINCES:
+        return _CA_PROVINCES[code]
+    return "OTHER"
+
 
 @dataclass
 class BuyerRow:
@@ -61,21 +257,6 @@ def norm_email(value: str | None) -> str | None:
     if not email or "@" not in email:
         return None
     return email
-
-
-def parse_us_state(raw: str | None, *, source: str) -> str:
-    text = (raw or "").strip().upper()
-    if not text:
-        return "OTHER"
-    if source == "legacy":
-        match = _STATE_IN_TEXT.search(text)
-        if match:
-            return match.group(1)
-        if text.startswith("CA") or " CALIF" in text:
-            return "CA"
-        return "OTHER"
-    code = text[:2] if len(text) >= 2 else text
-    return code if code in US_STATES else "OTHER"
 
 
 def state_tier(state: str) -> str:
@@ -121,7 +302,8 @@ def load_buyer_rows(legacy: Path, shopify: Path) -> list[BuyerRow]:
         prod = str(row[idx.get("Material Name", 0)] or "")
         token = parse_purchase_token(prod)
         loc = str(row[idx.get("LOCATION", 0)] or "")
-        state = parse_us_state(loc, source="legacy")
+        addr = str(row[idx.get("ADDRESS", 0)] or "")
+        state = parse_legacy_location(loc, addr)
         if email and token:
             rows.append(
                 BuyerRow(

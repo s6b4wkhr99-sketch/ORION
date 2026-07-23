@@ -21,10 +21,12 @@ class RawUpload(Base):
     status: Mapped[str] = mapped_column(String(32), default="pending")
     file_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     file_type: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    dataset_type: Mapped[str] = mapped_column(String(32), default="prospect", index=True)
     summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     raw_rows = relationship("RawCustomerData", back_populates="upload")
     customers = relationship("Customer", back_populates="upload")
+    buyer_purchases = relationship("BuyerPurchase", back_populates="upload")
 
 
 class RawCustomerData(Base):

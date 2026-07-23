@@ -10,8 +10,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.mapping.data_dictionary import EXPORT_VALUE_RESOLVERS
-from app.providers.export_builder import get_export_headers, resolve_export_value
+from app.providers.export_builder import build_export_row_dict, get_export_headers
 from app.providers.audit import log_provider_audit
 from app.providers.base import ExportContext, ExportResult, ImportContext, ImportValidation, ProviderAdapter
 from app.providers.config import PROVIDER_IMPORT_SIGNATURES
@@ -36,21 +35,15 @@ class CSVProviderAdapter(ProviderAdapter):
         writer.writeheader()
 
         for customer, intel in ctx.rows:
-            row_values: dict[str, str] = {}
-            for field, label in headers:
-                if field == "campaign_id":
-                    row_values[label] = ctx.campaign_id
-                elif field == "campaign_name":
-                    row_values[label] = ctx.campaign_name
-                elif field == "ceragem_segment":
-                    row_values[label] = intel.ceragem_segment or intel.prizm_proxy_segment or ""
-                elif field.startswith("intel_"):
-                    intel_field = field.replace("intel_", "")
-                    resolver = EXPORT_VALUE_RESOLVERS.get(intel_field)
-                    row_values[label] = resolver(customer, intel) if resolver else ""
-                else:
-                    row_values[label] = resolve_export_value(field, customer, intel)
-            writer.writerow(row_values)
+            writer.writerow(
+                build_export_row_dict(
+                    headers,
+                    campaign_id=ctx.campaign_id,
+                    campaign_name=ctx.campaign_name,
+                    customer=customer,
+                    intel=intel,
+                )
+            )
 
         csv_content = buffer.getvalue()
         os.makedirs(settings.upload_dir, exist_ok=True)

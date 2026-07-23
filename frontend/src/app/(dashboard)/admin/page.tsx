@@ -250,7 +250,11 @@ export default function AdminPage() {
           ]}
         />
         <p className="mt-2 text-xs text-[var(--cios-secondary)]">
-          Roles: {roles.join(", ")}. User changes via API audit every action.
+          Roles: {roles.join(", ")}. Manage users and role-based menu access in{" "}
+          <a href="/admin/users" className="font-medium text-indigo-600 hover:underline">
+            User Management
+          </a>
+          .
         </p>
       </section>
     </div>

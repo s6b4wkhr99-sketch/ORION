@@ -279,6 +279,10 @@ def resolve_rule_065_product(
 
     product = apply_v_m_anchor_nudge(product, inputs, ladder)
 
+    from app.intelligence.gap_calibration import apply_gap_calibration_adjustments
+
+    product, _gap_reason = apply_gap_calibration_adjustments(product, inputs, ladder)
+
     adjustment = {"adjusted_product": product, "adjusted": False, "adjustment_reason": "skipped"}
     sleep_adjustment = {
         "adjusted_product": product,

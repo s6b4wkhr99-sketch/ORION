@@ -340,8 +340,8 @@ export function RevenueByCityBubbleChart({
                       r={r}
                       fill={productColor(activeProduct ?? payload.product)}
                       fillOpacity={activeProduct ? 0.88 : 0.78}
-                      stroke="#fff"
-                      strokeWidth={1.5}
+                      stroke="rgba(255, 255, 255, 0.55)"
+                      strokeWidth={0.75}
                     />
                   );
                 }}

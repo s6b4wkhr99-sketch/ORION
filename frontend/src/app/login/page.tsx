@@ -1,0 +1,108 @@
+"use client";
+
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { APP_NAME, APP_TAGLINE } from "@/lib/config";
+import { useAuth } from "@/contexts/auth-context";
+
+function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login, session, loading } = useAuth();
+  const [email, setEmail] = useState("user@company.com");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const nextPath = searchParams.get("next") || "/mission-control";
+
+  useEffect(() => {
+    if (!loading && session) {
+      router.replace(nextPath);
+    }
+  }, [loading, session, router, nextPath]);
+
+  if (!loading && session) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[var(--cios-background)]">
+        <p className="text-sm text-[var(--cios-secondary)]">Redirecting…</p>
+      </div>
+    );
+  }
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await login(email.trim(), password);
+      router.replace(nextPath);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[var(--cios-background)] px-4">
+      <div className="w-full max-w-md rounded-2xl border border-[var(--cios-border)] bg-white p-8 shadow-sm">
+        <div className="mb-8 text-center">
+          <p className="text-2xl font-bold tracking-tight text-gray-900">{APP_NAME}</p>
+          <p className="mt-1 text-sm text-[var(--cios-secondary)]">{APP_TAGLINE}</p>
+        </div>
+
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div>
+            <label htmlFor="email" className="mb-1 block text-xs font-medium uppercase tracking-wide text-[var(--cios-secondary)]">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              autoComplete="username"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-lg border border-[var(--cios-border)] px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="password" className="mb-1 block text-xs font-medium uppercase tracking-wide text-[var(--cios-secondary)]">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-lg border border-[var(--cios-border)] px-3 py-2 text-sm"
+            />
+          </div>
+          {error ? <p className="text-sm text-red-600">{error}</p> : null}
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-lg bg-[var(--orion-accent)] px-4 py-2.5 text-sm font-semibold text-white hover:opacity-95 disabled:opacity-60"
+          >
+            {submitting ? "Signing in…" : "Sign in"}
+          </button>
+        </form>
+
+        <p className="mt-6 text-center text-xs text-[var(--cios-secondary)]">
+          Your role controls which menus and Export access you receive. Contact a System Administrator for access changes.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-[var(--cios-secondary)]">Loading…</div>}>
+      <LoginForm />
+    </Suspense>
+  );
+}

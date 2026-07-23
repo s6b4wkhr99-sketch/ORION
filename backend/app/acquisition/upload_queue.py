@@ -27,6 +27,7 @@ def enqueue_customer_upload(
         file_type=file_type,
         uploaded_by=uploaded_by,
         provider="customer_list",
+        dataset_type="prospect",
         status="pending",
     )
     db.add(upload)

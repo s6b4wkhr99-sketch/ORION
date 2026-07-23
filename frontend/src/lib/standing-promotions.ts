@@ -7,6 +7,9 @@ export const STANDING_PROMOTION_ORDER = [
   "Pause M6s",
 ] as const;
 
+/** Bump when Promotion Coverage KPI logic changes — used in executive cache keys + stale detection. */
+export const PROMOTION_COVERAGE_CACHE_VERSION = "conservative-v1";
+
 const STANDING_PROMOTION_SET = new Set<string>(STANDING_PROMOTION_ORDER);
 
 export type StandingPromotionRow = {
@@ -36,7 +39,7 @@ export function normalizeActivePromotions(rows: StandingPromotionRow[]): Standin
 }
 
 export type PromotionCoverageRow = {
-  product: string | null;
+  product?: string | null;
   promo_code: string;
   customers: number;
   coverage_pct: number;
@@ -45,14 +48,18 @@ export type PromotionCoverageRow = {
   direct?: number;
   up_convert?: number;
   down_convert?: number;
+  segment_in?: number;
+  afford_own?: number;
+  unreachable?: number;
   kpi_basis?: string;
+  promotion_coverage_version?: string;
 };
 
 export function normalizePromotionCoverage(rows: PromotionCoverageRow[]): PromotionCoverageRow[] {
-  const none = rows.find((row) => !row.product);
+  const productRows = rows.filter((row) => row.product);
+  const unassignedRows = rows.filter((row) => !row.product);
   const merged = new Map<string, PromotionCoverageRow>();
-  for (const row of rows) {
-    if (!row.product) continue;
+  for (const row of productRows) {
     const product = normalizeStandingPromoProduct(row.product);
     const prev = merged.get(product);
     if (!prev) {
@@ -69,14 +76,35 @@ export function normalizePromotionCoverage(rows: PromotionCoverageRow[]): Promot
       direct: (prev.direct ?? 0) + (row.direct ?? 0),
       up_convert: (prev.up_convert ?? 0) + (row.up_convert ?? 0),
       down_convert: (prev.down_convert ?? 0) + (row.down_convert ?? 0),
+      segment_in: (prev.segment_in ?? 0) + (row.segment_in ?? 0),
       kpi_basis: prev.kpi_basis || row.kpi_basis,
     });
   }
-  const ordered = STANDING_PROMOTION_ORDER.flatMap((product) => {
+  const standingRows = STANDING_PROMOTION_ORDER.flatMap((product) => {
     const row = merged.get(product);
     return row ? [row] : [];
   });
-  return none ? [...ordered, none] : ordered;
+  const unassigned = unassignedRows.reduce<PromotionCoverageRow | null>((acc, row) => {
+    if (!acc) {
+      return { ...row, product: null };
+    }
+    return {
+      ...acc,
+      customers: acc.customers + row.customers,
+      coverage_pct: Math.round((acc.coverage_pct + row.coverage_pct) * 10) / 10,
+      afford_own: (acc.afford_own ?? 0) + (row.afford_own ?? 0),
+      unreachable: (acc.unreachable ?? 0) + (row.unreachable ?? 0),
+    };
+  }, null);
+  return unassigned ? [...standingRows, unassigned] : standingRows;
+}
+
+/** True when a cached executive payload still reflects pre-conservative coverage logic. */
+export function isStalePromotionCoverageCache(
+  commercial: { promotion_coverage?: PromotionCoverageRow[]; promotion_coverage_version?: string } | null | undefined,
+): boolean {
+  if (!commercial?.promotion_coverage?.length) return false;
+  return commercial.promotion_coverage_version !== PROMOTION_COVERAGE_CACHE_VERSION;
 }
 
 export function filterStandingPromotions(rows: StandingPromotionRow[]): StandingPromotionRow[] {

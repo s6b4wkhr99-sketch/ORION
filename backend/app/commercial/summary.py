@@ -11,10 +11,9 @@ from app.campaign.standing_promo_demand import (
     build_standing_promo_opportunity_rows,
     merge_standing_promo_product_rows,
     pick_highest_conversion_opportunity,
-    project_standing_promo_customers,
 )
 from app.intelligence.promo_price_response import (
-    aggregate_price_responsive_promo_coverage,
+    aggregate_conservative_promo_coverage,
     load_promo_coverage_cohort_rows,
 )
 from app.commercial.catalog import active_products, get_runtime_version, product_by_code
@@ -93,31 +92,45 @@ def _catalog_kpis() -> list[dict]:
     return rows
 
 
+def _intelligence_customer_count(db: Session, upload_id: uuid.UUID | None) -> int:
+    """Full scoped customer count with intelligence — Promotion Coverage DB denominator."""
+    try:
+        q = db.query(func.count(Customer.customer_id)).join(
+            CustomerIntelligence, CustomerIntelligence.customer_id == Customer.customer_id
+        )
+        if upload_id:
+            q = q.filter(Customer.upload_id == upload_id)
+        value = q.scalar()
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return 0
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return 0
+
+
 def _promotion_coverage(
     db: Session,
     upload_id: uuid.UUID | None,
     product_rows: list[dict],
     targetable_customers: float = 0,
 ) -> list[dict]:
-    """Coverage per standing-promo SKU — post-promo price response + legacy primary/projected."""
+    """Conservative reach per standing-promo SKU — afford-own gate; M10 adds segment-in."""
     product_rows = merge_standing_promo_product_rows(product_rows)
     product_map = {row.get("product"): row for row in product_rows if row.get("product")}
-    total_product_customers = sum(int(row.get("customers") or 0) for row in product_rows)
-    total = max(int(targetable_customers or total_product_customers), 0)
+    db_total = _intelligence_customer_count(db, upload_id)
+    if db_total <= 0 and targetable_customers:
+        db_total = int(targetable_customers)
+    if db_total <= 0:
+        total_product_customers = sum(int(row.get("customers") or 0) for row in product_rows)
+        db_total = max(total_product_customers, 0)
 
-    if total == 0:
-        q = db.query(func.count(CustomerIntelligence.id)).join(
-            Customer, Customer.customer_id == CustomerIntelligence.customer_id
-        )
-        if upload_id:
-            q = q.filter(Customer.upload_id == upload_id)
-        total = int(q.scalar() or 0)
-
-    denominator = max(total, 1)
-    projected_customers = project_standing_promo_customers(db, upload_id)
+    denominator = max(db_total, 1)
     cohort_rows = load_promo_coverage_cohort_rows(db, upload_id)
-    price_responsive = aggregate_price_responsive_promo_coverage(cohort_rows) if cohort_rows else {}
-    price_basis = bool(price_responsive)
+    responsive_by_sku: dict[str, dict] = {}
+    unassigned: dict[str, int] = {"customers": 0, "afford_own": 0, "unreachable": 0}
+    if cohort_rows:
+        responsive_by_sku, unassigned = aggregate_conservative_promo_coverage(cohort_rows)
+    responsive_basis = bool(responsive_by_sku or unassigned.get("customers"))
 
     coverage: list[dict] = []
     for product_code in standing_promo_product_order():
@@ -126,44 +139,79 @@ def _promotion_coverage(
             continue
         row = product_map.get(product_code)
         primary_direct = int(row.get("customers") or 0) if row else 0
-        projected = int(projected_customers.get(product_code) or 0)
-        responsive = price_responsive.get(product_code, {})
-        responsive_customers = int(responsive.get("customers") or 0)
-
-        if price_basis and responsive_customers > 0:
-            customers = responsive_customers
-            kpi_basis = "post_promo_price_response"
+        responsive = responsive_by_sku.get(product_code, {})
+        direct_count = int(responsive.get("direct") or 0) if responsive_basis else primary_direct
+        reach = int(responsive.get("customers") or 0) if responsive_basis else primary_direct
+        if responsive_basis:
+            kpi_basis = "conservative_promo_reach"
         else:
-            customers = max(primary_direct, projected)
-            kpi_basis = "projected_standing_promo" if projected > primary_direct else "primary_sku"
+            kpi_basis = "primary_sku_direct"
 
         coverage.append(
             {
                 "product": product_code,
                 "promo_code": code,
-                "customers": customers,
-                "coverage_pct": round(customers / denominator * 100, 1),
-                "projected": customers > primary_direct,
+                "customers": reach,
+                "coverage_pct": round(reach / denominator * 100, 1),
+                "projected": False,
                 "primary_direct": primary_direct,
-                "direct": int(responsive.get("direct") or 0) if price_basis else primary_direct,
+                "direct": direct_count,
                 "up_convert": int(responsive.get("up_convert") or 0),
                 "down_convert": int(responsive.get("down_convert") or 0),
+                "segment_in": int(responsive.get("segment_in") or 0),
                 "kpi_basis": kpi_basis,
             }
         )
 
-    standing_covered = sum(int(row.get("customers") or 0) for row in coverage)
-    none_customers = max(0, denominator - standing_covered)
-    coverage.append(
-        {
-            "product": None,
-            "promo_code": "None Promotion Target",
-            "customers": none_customers,
-            "coverage_pct": round(none_customers / denominator * 100, 1),
-            "kpi_basis": "residual",
-        }
-    )
+    unassigned_customers = int(unassigned.get("customers") or 0)
+    if unassigned_customers > 0:
+        coverage.append(
+            {
+                "product": None,
+                "promo_code": "—",
+                "customers": unassigned_customers,
+                "coverage_pct": round(unassigned_customers / denominator * 100, 1),
+                "projected": False,
+                "afford_own": int(unassigned.get("afford_own") or 0),
+                "unreachable": int(unassigned.get("unreachable") or 0),
+                "kpi_basis": "conservative_unassigned",
+            }
+        )
+
     return coverage
+
+
+def build_promotion_coverage_snapshot(
+    db: Session,
+    upload_id: uuid.UUID | str | None = None,
+) -> dict:
+    """Live conservative Promotion Coverage — not wrapped in executive dashboard cache."""
+    uid: uuid.UUID | None = None
+    if upload_id:
+        uid = upload_id if isinstance(upload_id, uuid.UUID) else uuid.UUID(str(upload_id))
+    cohort_rows = load_promo_coverage_cohort_rows(db, uid)
+    product_counts: dict[str, int] = {}
+    for row in cohort_rows:
+        code = str(row.get("product") or "").strip()
+        if not code:
+            continue
+        product_counts[code] = product_counts.get(code, 0) + int(row.get("customers") or 0)
+    product_rows = [
+        {"product": product, "customers": customers, "revenue": 0.0, "share_pct": 0.0}
+        for product, customers in sorted(product_counts.items(), key=lambda item: -item[1])
+    ]
+    targetable = float(_intelligence_customer_count(db, uid))
+    coverage = _promotion_coverage(
+        db,
+        uid,
+        product_rows,
+        targetable_customers=targetable,
+    )
+    return {
+        "promotion_coverage_version": "conservative-v1",
+        "promotion_coverage": coverage,
+        "db_customers": int(targetable or sum(product_counts.values())),
+    }
 
 
 def _commercial_health_score(catalog_rows: list[dict], product_rows: list[dict]) -> float:
@@ -266,6 +314,7 @@ def build_commercial_intelligence_summary(
         "promotion_coverage": _promotion_coverage(
             db, upload_id, product_rows, targetable_customers=targetable_customers
         ),
+        "promotion_coverage_version": "conservative-v1",
         "promo_policy_version": "2026.07-promo-policy-v2",
         "commercial_health_score": _commercial_health_score(catalog_rows, product_rows),
         "highest_margin_sku": _sku_highlight(highest_margin),

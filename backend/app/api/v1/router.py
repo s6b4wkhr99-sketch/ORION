@@ -1,5 +1,7 @@
 """Volume 07 — RESTful API v1."""
 
+import csv
+import io
 import json
 import uuid
 
@@ -8,8 +10,17 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.database import get_db
+
 from app.acquisition.preview import preview_upload
 from app.acquisition.upload import UploadValidationError, process_upload, save_upload_file
+from app.acquisition.buyer_upload import (
+    buyer_matched_rows_for_download,
+    delete_buyer_upload,
+    preview_buyer_upload,
+    process_buyer_upload,
+)
+from app.campaign.buyer_gap_service import run_upload_gap_analysis
 from app.acquisition.upload_profile import get_upload_processing_profile
 from app.acquisition.upload_queue import enqueue_customer_upload, get_upload_status, upload_status_payload
 from app.api.auth import login, refresh
@@ -43,7 +54,7 @@ from app.api.services.campaigns import (
 from app.security.audit import list_audit_logs, record_audit
 from app.security.upload_validation import UploadRuleError, validate_upload_file
 from app.schemas.auth import LoginRequest, RefreshRequest
-from app.schemas.admin import UserCreateRequest, UserPasswordRequest, UserRoleRequest
+from app.schemas.admin import UserCreateRequest, UserPasswordRequest, UserRoleRequest, UserUpdateRequest
 from app.schemas.analytics import AnalyticsReportRequest
 from app.schemas.campaign import CampaignCreateRequest, CampaignUpdateRequest
 from app.schemas.export import ExportRequest
@@ -129,17 +140,19 @@ from app.providers.import_validation import ImportValidationError
 from app.providers.info import get_provider, list_providers
 from app.campaign.forecast import compute_campaign_forecast
 from app.campaign.reports import process_campaign_report
-from app.database import get_db
 from app.operations.admin_dashboard import get_admin_dashboard
 from app.operations.checklists import daily_checklist, end_of_day_checklist
 from app.operations.metrics_store import operational_metrics
 from app.operations.user_admin import (
     assign_role,
     create_user,
+    delete_user,
     list_users,
     reset_password,
     set_user_active,
     unlock_user,
+    update_user,
+    update_user_profile,
 )
 from app.security.roles import ALL_ROLES
 from app.models.export import ExportJob
@@ -164,7 +177,7 @@ def auth_login(body: LoginRequest, request: Request, db: Session = Depends(get_d
         ip_address=request.client.host if request.client else None,
         browser=request.headers.get("user-agent"),
     )
-    return ok({"token": result.token, "expires": result.expires, "role": result.role})
+    return ok({"token": result.token, "expires": result.expires, "role": result.role, "email": body.email})
 
 
 @router.post("/auth/refresh")
@@ -186,6 +199,31 @@ def auth_logout(request: Request, db: Session = Depends(get_db), user: dict = De
         browser=user.get("browser"),
     )
     return ok({"loggedOut": True})
+
+
+@router.get("/auth/me")
+def auth_me(db: Session = Depends(get_db), user: dict = Depends(get_current_user)):
+    from app.models.user import User
+    from app.security.permissions import effective_modules_for_user
+
+    email = user.get("email", "")
+    name = user.get("name") or email.split("@")[0]
+    role = user.get("role", "")
+    allowed_modules = None
+    row = db.query(User).filter(User.email == email).first() if email else None
+    if row:
+        name = row.name or name
+        role = row.role or role
+        allowed_modules = row.allowed_modules
+    return ok(
+        {
+            "email": email,
+            "name": name,
+            "role": role,
+            "modules": effective_modules_for_user(role, allowed_modules),
+            "allowedModules": allowed_modules,
+        }
+    )
 
 
 @router.get("/audit/logs")
@@ -376,6 +414,14 @@ def delete_upload(upload_id: str, db: Session = Depends(get_db), user: dict = De
     upload = db.query(RawUpload).filter(RawUpload.upload_id == uuid.UUID(upload_id)).first()
     if not upload:
         raise HTTPException(status_code=404, detail={"success": False, "message": "Upload not found"})
+    if upload.dataset_type == "buyer":
+        try:
+            delete_buyer_upload(db, uuid.UUID(upload_id))
+        except UploadValidationError as e:
+            raise HTTPException(status_code=400, detail={"success": False, "message": str(e)}) from e
+    else:
+        db.delete(upload)
+        db.commit()
     record_audit(
         db,
         action="delete_upload",
@@ -386,14 +432,176 @@ def delete_upload(upload_id: str, db: Session = Depends(get_db), user: dict = De
         ip_address=user.get("ip_address"),
         browser=user.get("browser"),
     )
-    db.delete(upload)
-    db.commit()
     return ok({"deleted": upload_id})
 
 
 @router.get("/uploads")
-def uploads_list(db: Session = Depends(get_db), _user: dict = Depends(require_upload)):
-    return ok({"uploads": list_uploads(db)})
+def uploads_list(
+    dataset_type: str | None = Query(None, description="Filter: prospect | buyer"),
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_upload),
+):
+    return ok({"uploads": list_uploads(db, dataset_type=dataset_type)})
+
+
+@router.post("/buyers/upload/preview")
+async def buyers_upload_preview(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_upload),
+):
+    content = await file.read()
+    try:
+        validate_upload_file(file.filename, content, file.content_type)
+    except UploadRuleError as e:
+        raise HTTPException(status_code=400, detail={"success": False, "message": str(e)}) from e
+    file_path = save_upload_file(content, file.filename or "buyer_preview.csv")
+    try:
+        return ok(preview_buyer_upload(db, file_path, file.filename or "buyer_preview.csv"))
+    except UploadValidationError as e:
+        raise HTTPException(status_code=422, detail={"success": False, "message": str(e)}) from e
+
+
+@router.post("/buyers/upload")
+async def buyers_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_upload),
+):
+    content = await file.read()
+    try:
+        validate_upload_file(file.filename, content, file.content_type)
+    except UploadRuleError as e:
+        raise HTTPException(status_code=400, detail={"success": False, "message": str(e)}) from e
+    file_path = save_upload_file(content, file.filename or "buyer_upload.csv")
+    uploaded_by = user.get("email", "system")
+    try:
+        upload = process_buyer_upload(
+            db, file_path, file.filename or "buyer_upload.csv", uploaded_by=uploaded_by
+        )
+    except UploadValidationError as e:
+        raise HTTPException(status_code=422, detail={"success": False, "message": str(e)}) from e
+    summary = json.loads(upload.summary_json) if upload.summary_json else {}
+    record_audit(
+        db,
+        action="upload_buyer_file",
+        user_id=user.get("email"),
+        role=user.get("role"),
+        entity_type="upload",
+        entity_id=str(upload.upload_id),
+        ip_address=user.get("ip_address"),
+        browser=user.get("browser"),
+    )
+    return ok(
+        {
+            "upload_id": str(upload.upload_id),
+            "file_name": upload.filename,
+            "status": upload.status,
+            "summary": summary,
+            "matched_emails": summary.get("matched_emails", 0),
+            "unique_emails": summary.get("unique_emails", 0),
+            "match_rate_pct": summary.get("match_rate_pct", 0),
+            "gap_report": summary.get("gap_report"),
+        }
+    )
+
+
+@router.delete("/buyers/upload/{upload_id}")
+def buyers_upload_delete(
+    upload_id: str,
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_upload),
+):
+    try:
+        upload = delete_buyer_upload(db, uuid.UUID(upload_id))
+    except UploadValidationError as e:
+        raise HTTPException(status_code=400, detail={"success": False, "message": str(e)}) from e
+    if not upload:
+        raise HTTPException(status_code=404, detail={"success": False, "message": "Upload not found"})
+    record_audit(
+        db,
+        action="delete_buyer_upload",
+        user_id=user.get("email"),
+        role=user.get("role"),
+        entity_type="upload",
+        entity_id=upload_id,
+        ip_address=user.get("ip_address"),
+        browser=user.get("browser"),
+    )
+    return ok({"deleted": upload_id})
+
+
+@router.get("/buyers/upload/{upload_id}/gap-report")
+def buyers_gap_report(
+    upload_id: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_upload),
+):
+    report = run_upload_gap_analysis(db, uuid.UUID(upload_id))
+    if report.get("error"):
+        raise HTTPException(status_code=404, detail={"success": False, "message": report["error"]})
+    return ok(report)
+
+
+@router.get("/buyers/upload/{upload_id}/matched-download")
+def buyers_matched_download(
+    upload_id: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_upload),
+):
+    rows = buyer_matched_rows_for_download(db, uuid.UUID(upload_id))
+    if not rows:
+        raise HTTPException(
+            status_code=404,
+            detail={"success": False, "message": "No ORION-matched buyer emails for this upload."},
+        )
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=list(rows[0].keys()))
+    writer.writeheader()
+    writer.writerows(rows)
+    buffer.seek(0)
+    return StreamingResponse(
+        iter([buffer.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f'attachment; filename="buyer_matched_{upload_id[:8]}.csv"',
+        },
+    )
+
+
+@router.get("/buyers/prospect-match-stats")
+def buyers_prospect_match_stats(db: Session = Depends(get_db), _user: dict = Depends(require_upload)):
+    """Count distinct buyer-upload emails that match ORION prospect intelligence."""
+    from app.models.buyer import BuyerPurchase
+    from app.models.customer import Customer, CustomerIntelligence
+    from sqlalchemy import distinct, func
+
+    total_buyer_emails = (
+        db.query(func.count(distinct(BuyerPurchase.email)))
+        .scalar()
+        or 0
+    )
+    matched_emails = (
+        db.query(func.count(distinct(BuyerPurchase.email)))
+        .filter(BuyerPurchase.matched_customer_id.isnot(None))
+        .scalar()
+        or 0
+    )
+    total_prospect_emails = (
+        db.query(func.count(distinct(Customer.email)))
+        .join(CustomerIntelligence, CustomerIntelligence.customer_id == Customer.customer_id)
+        .filter(Customer.email.isnot(None))
+        .scalar()
+        or 0
+    )
+    return ok(
+        {
+            "buyer_unique_emails": total_buyer_emails,
+            "buyer_matched_emails": matched_emails,
+            "buyer_match_rate_pct": round(100 * matched_emails / max(total_buyer_emails, 1), 2),
+            "prospect_emails_with_intel": total_prospect_emails,
+        }
+    )
 
 
 # --- Section 5: Intelligence API ---
@@ -842,6 +1050,18 @@ def report_dashboard(campaign_id: str, db: Session = Depends(get_db), _user: dic
 @router.get("/dashboard/executive")
 def dashboard_executive(upload_id: str | None = None, db: Session = Depends(get_db), _user: dict = Depends(require_dashboard)):
     return ok(get_executive_summary(db, upload_id))
+
+
+@router.get("/dashboard/promotion-coverage")
+def dashboard_promotion_coverage(
+    upload_id: str | None = None,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_dashboard),
+):
+    """Conservative Promotion Coverage — computed live, bypasses executive dashboard cache."""
+    from app.commercial.summary import build_promotion_coverage_snapshot
+
+    return ok(build_promotion_coverage_snapshot(db, upload_id))
 
 
 @router.get("/dashboard/customer")
@@ -1313,15 +1533,21 @@ def knowledge_acceptance_criteria(db: Session = Depends(get_db), _user: dict = D
 
 
 class CommercialSimulateRequest(BaseModel):
-    product: str
+    product: str | None = None
+    products: list[str] | None = None
+    additionalProducts: list[str] | None = None
     targetCustomers: int = 1000
+    targetCustomersBySku: list[dict] | None = None
     sellingPrice: float | None = None
     promotionPct: float | None = None
     maxPromotion: float | None = None
+    additionalPromotionPct: float | None = None
+    additionalPromotionMax: float | None = None
     promoCode: str | None = None
     leFrameIncentiveRate: float | None = None
     corporatePriority: float = 0.5
     inventoryUnits: int | None = None
+    conversionRate: float | None = None
 
 
 @router.get("/commercial/catalog")
@@ -1472,23 +1698,141 @@ def commercial_version_rollback(
 
 @router.post("/commercial/simulate")
 def commercial_simulate(body: CommercialSimulateRequest, _user: dict = Depends(require_dashboard)):
-    from app.commercial.simulator import simulate_commercial_scenario
+    from app.commercial.simulator import simulate_commercial_multi
+
+    if body.products:
+        product_codes = body.products
+    elif body.product:
+        product_codes = [body.product.strip()]
+        for sku in body.additionalProducts or []:
+            code = (sku or "").strip()
+            if code and code not in product_codes:
+                product_codes.append(code)
+    else:
+        raise HTTPException(status_code=422, detail={"success": False, "message": "product or products is required"})
 
     try:
-        result = simulate_commercial_scenario(
-            product_code=body.product,
+        result = simulate_commercial_multi(
+            product_codes,
             target_customers=body.targetCustomers,
+            target_customers_by_sku=body.targetCustomersBySku,
             selling_price=body.sellingPrice,
             promotion_pct=body.promotionPct,
             max_promotion=body.maxPromotion,
+            additional_promotion_pct=body.additionalPromotionPct,
+            additional_promotion_max=body.additionalPromotionMax,
             promo_code=body.promoCode,
             le_frame_incentive_rate=body.leFrameIncentiveRate,
             corporate_priority=body.corporatePriority,
             inventory_units=body.inventoryUnits,
+            conversion_rate=body.conversionRate,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"success": False, "message": str(e)}) from e
     return ok(result)
+
+
+@router.post("/commercial/simulate/audience-upload")
+async def commercial_simulate_audience_upload(
+    file: UploadFile = File(...),
+    corporatePriority: float = Form(0.5),
+    leFrameIncentiveRate: float | None = Form(0.15),
+    inventoryUnits: int | None = Form(None),
+    conversionRate: float | None = Form(None),
+    _user: dict = Depends(require_dashboard),
+):
+    from app.commercial.audience_upload import analyze_audience_export_csv
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail={"success": False, "message": "Empty file."})
+    try:
+        validate_upload_file(file.filename, content, file.content_type)
+    except UploadRuleError as e:
+        raise HTTPException(status_code=400, detail={"success": False, "message": str(e)}) from e
+    try:
+        result = analyze_audience_export_csv(
+            content,
+            corporate_priority=corporatePriority,
+            le_frame_incentive_rate=leFrameIncentiveRate,
+            inventory_units=inventoryUnits,
+            conversion_rate=conversionRate,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail={"success": False, "message": str(e)}) from e
+    return ok(result)
+
+
+class CommercialSimulatorForecastSaveRequest(BaseModel):
+    name: str | None = None
+    mainSku: str
+    additionalSkus: list[str] = []
+    inputs: dict
+    result: dict
+    audience: dict | None = None
+    audienceFileName: str | None = None
+
+
+@router.post("/commercial/simulator/forecasts")
+def commercial_simulator_forecast_save(
+    body: CommercialSimulatorForecastSaveRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_dashboard),
+):
+    from app.commercial.forecast_storage import save_commercial_simulator_forecast
+
+    try:
+        row = save_commercial_simulator_forecast(
+            db,
+            name=body.name,
+            main_sku=body.mainSku,
+            additional_skus=body.additionalSkus,
+            inputs=body.inputs,
+            result=body.result,
+            audience=body.audience,
+            audience_file_name=body.audienceFileName,
+            created_by=user.get("email"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail={"success": False, "message": str(e)}) from e
+    return ok(row)
+
+
+@router.get("/commercial/simulator/forecasts")
+def commercial_simulator_forecast_list(
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_dashboard),
+):
+    from app.commercial.forecast_storage import list_commercial_simulator_forecasts
+
+    return ok({"items": list_commercial_simulator_forecasts(db)})
+
+
+@router.get("/commercial/simulator/forecasts/{forecast_id}")
+def commercial_simulator_forecast_get(
+    forecast_id: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_dashboard),
+):
+    from app.commercial.forecast_storage import get_commercial_simulator_forecast
+
+    row = get_commercial_simulator_forecast(db, forecast_id)
+    if not row:
+        raise HTTPException(status_code=404, detail={"success": False, "message": "Forecast not found"})
+    return ok(row)
+
+
+@router.delete("/commercial/simulator/forecasts/{forecast_id}")
+def commercial_simulator_forecast_delete(
+    forecast_id: str,
+    db: Session = Depends(get_db),
+    _user: dict = Depends(require_dashboard),
+):
+    from app.commercial.forecast_storage import delete_commercial_simulator_forecast
+
+    if not delete_commercial_simulator_forecast(db, forecast_id):
+        raise HTTPException(status_code=404, detail={"success": False, "message": "Forecast not found"})
+    return ok({"deleted": True, "id": forecast_id})
 
 
 # --- Volume 14: System Administration ---
@@ -1522,9 +1866,49 @@ def admin_users_list(db: Session = Depends(get_db), _user: dict = Depends(requir
 @router.post("/admin/users")
 def admin_users_create(body: UserCreateRequest, db: Session = Depends(get_db), user: dict = Depends(require_user_admin)):
     try:
-        data = create_user(db, email=str(body.email), password=body.password, name=body.name, role=body.role, actor=user)
+        data = create_user(
+            db,
+            email=str(body.email),
+            password=body.password,
+            name=body.name,
+            role=body.role,
+            actor=user,
+            allowed_modules=body.allowed_modules,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"success": False, "message": str(e)}) from e
+    return ok(data)
+
+
+@router.put("/admin/users/{email}")
+def admin_users_update(
+    email: str,
+    body: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    user: dict = Depends(require_user_admin),
+):
+    if (
+        body.email is None
+        and body.name is None
+        and body.role is None
+        and body.menu_access_mode is None
+        and body.allowed_modules is None
+    ):
+        raise HTTPException(status_code=400, detail={"success": False, "message": "No updates provided"})
+    try:
+        data = update_user(
+            db,
+            email,
+            new_email=str(body.email) if body.email else None,
+            name=body.name,
+            role=body.role,
+            allowed_modules=body.allowed_modules,
+            menu_access_mode=body.menu_access_mode,
+            actor=user,
+        )
+    except ValueError as e:
+        status = 404 if str(e) == "User not found" else 400
+        raise HTTPException(status_code=status, detail={"success": False, "message": str(e)}) from e
     return ok(data)
 
 
@@ -1572,6 +1956,16 @@ def admin_users_unlock(email: str, db: Session = Depends(get_db), user: dict = D
         data = unlock_user(db, email, user)
     except ValueError as e:
         raise HTTPException(status_code=404, detail={"success": False, "message": str(e)}) from e
+    return ok(data)
+
+
+@router.delete("/admin/users/{email}")
+def admin_users_delete(email: str, db: Session = Depends(get_db), user: dict = Depends(require_user_admin)):
+    try:
+        data = delete_user(db, email, user)
+    except ValueError as e:
+        status = 404 if str(e) == "User not found" else 400
+        raise HTTPException(status_code=status, detail={"success": False, "message": str(e)}) from e
     return ok(data)
 
 

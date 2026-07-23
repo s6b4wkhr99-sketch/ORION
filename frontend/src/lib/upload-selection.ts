@@ -15,9 +15,14 @@ export function resolveUploadSelection(list: UploadSummary[], current: string | 
   return null;
 }
 
-/** Prefer the completed upload with the most imported rows (skip failed/empty batches). */
+/** Prefer the completed prospect upload with the most imported rows (skip failed/empty/buyer batches). */
 export function pickDefaultUploadId(list: UploadSummary[]): string | null {
-  const candidates = list.filter((u) => u.status === "completed" && uploadRowCount(u) > 0);
+  const candidates = list.filter(
+    (u) =>
+      u.status === "completed" &&
+      uploadRowCount(u) > 0 &&
+      (u.dataset_type ?? "prospect") === "prospect",
+  );
   if (!candidates.length) return null;
   candidates.sort((a, b) => uploadRowCount(b) - uploadRowCount(a));
   return candidates[0]?.id ?? null;
@@ -26,5 +31,6 @@ export function pickDefaultUploadId(list: UploadSummary[]): string | null {
 export function isUploadUsable(upload: UploadSummary | undefined): boolean {
   if (!upload) return false;
   if (upload.status === "failed") return false;
+  if ((upload.dataset_type ?? "prospect") !== "prospect") return false;
   return upload.status === "completed" && uploadRowCount(upload) > 0;
 }

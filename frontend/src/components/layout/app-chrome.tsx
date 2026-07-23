@@ -17,13 +17,24 @@ import {
   Map,
   Package,
   Settings,
+  ShoppingCart,
   Sparkles,
   Upload,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { APP_NAME, APP_TAGLINE, getPrimaryNav, type NavItem } from "@/lib/config";
+import type { PermissionModule } from "@/lib/access-control";
+import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
+
+function userInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "U";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+}
 
 const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Home,
@@ -40,10 +51,13 @@ const ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   Activity,
   Package,
   Calculator,
+  ShoppingCart,
+  Users,
 };
 
 function isNavActive(pathname: string, href: string): boolean {
-  if (href === "/mission-control") return pathname === href;
+  // Exact match only — child routes live under /admin/* and must not highlight Platform Health.
+  if (href === "/mission-control" || href === "/admin") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
@@ -60,8 +74,15 @@ type SidebarProps = {
 
 export function Sidebar({ collapsed, onToggle, className }: SidebarProps) {
   const pathname = usePathname();
-  const navItems = getPrimaryNav();
-  const [adminOpen, setAdminOpen] = useState(() => pathname.startsWith("/admin") || pathname.startsWith("/import"));
+  const { session, logout } = useAuth();
+  const navItems = getPrimaryNav(
+    session?.role ?? "System Administrator",
+    session?.modules as PermissionModule[] | undefined,
+    session?.allowedMenus,
+  );
+  const [adminOpen, setAdminOpen] = useState(
+    () => pathname.startsWith("/admin") || pathname.startsWith("/import") || pathname.startsWith("/export"),
+  );
 
   return (
     <aside
@@ -168,11 +189,11 @@ export function Sidebar({ collapsed, onToggle, className }: SidebarProps) {
         {!collapsed ? (
           <div className="flex items-center gap-3 rounded-lg px-2 py-2">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--orion-accent)] text-xs font-bold text-white">
-              JP
+              {userInitials(session?.name ?? "User")}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-white">Joseph Park</p>
-              <p className="truncate text-xs text-slate-400">Administrator</p>
+              <p className="truncate text-sm font-medium text-white">{session?.name ?? "User"}</p>
+              <p className="truncate text-xs text-slate-400">{session?.role ?? "—"}</p>
             </div>
             <button
               type="button"
@@ -193,6 +214,15 @@ export function Sidebar({ collapsed, onToggle, className }: SidebarProps) {
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
+        {!collapsed ? (
+          <button
+            type="button"
+            onClick={logout}
+            className="mt-2 w-full rounded-lg px-2 py-2 text-left text-xs text-slate-400 hover:bg-white/10 hover:text-white"
+          >
+            Sign out
+          </button>
+        ) : null}
       </div>
     </aside>
   );

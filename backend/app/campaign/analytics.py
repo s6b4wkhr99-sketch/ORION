@@ -349,11 +349,15 @@ def get_campaign_dashboard(db: Session, campaign_id: str | None = None) -> dict:
     }
 
 
-def list_uploads(db: Session) -> list[dict]:
-    uploads = db.query(RawUpload).order_by(RawUpload.uploaded_date.desc()).all()
+def list_uploads(db: Session, *, dataset_type: str | None = None) -> list[dict]:
+    q = db.query(RawUpload).order_by(RawUpload.uploaded_date.desc())
+    if dataset_type:
+        q = q.filter(RawUpload.dataset_type == dataset_type)
+    uploads = q.all()
     return [{
         "id": str(u.upload_id),
         "file_name": u.filename,
+        "dataset_type": getattr(u, "dataset_type", None) or "prospect",
         "total_rows": json.loads(u.summary_json).get("total_rows", 0) if u.summary_json else 0,
         "valid_emails": json.loads(u.summary_json).get("valid_emails", 0) if u.summary_json else 0,
         "status": u.status,

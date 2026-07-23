@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -19,3 +19,4 @@ class User(Base):
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    allowed_modules: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
