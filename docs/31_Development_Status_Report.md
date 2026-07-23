@@ -1,8 +1,8 @@
 # Volume 31 — Development Status Report (개발 현황 보고서)
 
-**Version:** 1.1.2  
+**Version:** 1.1.3  
 **Report Date:** 2026-07-23  
-**Status:** Local Native Pilot (로컬 네이티브 파일럿) — Phase A/B/C complete  
+**Status:** Local Native Pilot — Phase A/B/C complete · GitHub `origin/main`  
 **Audience:** 개발자, PM, QA, 운영
 
 ---
@@ -23,9 +23,9 @@
 
 | 항목 | 값 |
 |------|-----|
-| **애플리케이션 버전** | **1.1.0** |
-| 이전 공식 릴리스 | 1.0.1 (2026-07-08) |
-| Git baseline | `main` @ `5d07a0b` (2026-07-21 GAP baseline) + 미커밋 로컬 변경 |
+| **애플리케이션 버전** | **1.1.3** |
+| 이전 공식 릴리스 | 1.1.2 (2026-07-23) |
+| Git | `main` @ GitHub [s6b4wkhr99-sketch/ORION](https://github.com/s6b4wkhr99-sketch/ORION) |
 | DB 마이그레이션 | Alembic `0018_user_allowed_modules` (head) |
 | Frontend | Next.js 16 · `http://127.0.0.1:3002` |
 | Backend | FastAPI · `http://127.0.0.1:8000/api/v1` |
@@ -109,10 +109,10 @@
 | 핵심 기능 | 7/10 | 업로드→인텔리전스→대시보드→Admin 동작 |
 | UI/UX | 6.5/10 | ORION UI 정돈; dev 환경 이슈 잔존 |
 | 백엔드 | 8/10 | 테스트·마이그레이션 양호 |
-| 프론트엔드 | 6/10 | 자동 E2E 없음 |
-| 로컬 운영 편의 | 5/10 | Postgres + worker + Terminal 유지 |
+| 프론트엔드 | 7/10 | Playwright smoke 5 tests; cancel UI (v1.1.3) |
+| 로컬 운영 편의 | 7/10 | `dev.sh` 통합; Terminal 유지 |
 | 보안 (로컬) | 5/10 | dev secret·시드 비밀번호 |
-| **종합 (로컬 네이티브)** | **~65–70%** | 내부 파일럿·개발 가능 |
+| **종합 (로컬 네이티브)** | **~75%** | 내부 파일럿·개발 가능 |
 
 ### 4.2 공식 로컬 시작 방법
 
@@ -158,18 +158,16 @@ Async upload 사용 시 별도 터미널: `make worker`
 
 ---
 
-## 6. 미커밋 작업 범위 (2026-07-23 기준)
+## 6. Git · 원격 저장소
 
-`main` 브랜치에 **로컬 미커밋 변경**이 다수 존재합니다. v1.1.0 태그 전 팀 합의 후 커밋 권장.
+| 항목 | 값 |
+|------|-----|
+| Remote | `git@github.com:s6b4wkhr99-sketch/ORION.git` |
+| Branch | `main` (tracks `origin/main`) |
+| Tags | `v1.1.0` … `v1.1.3` |
+| SSH 등록 | `Ceragem CIOS` key on GitHub |
 
-**주요 미추적(??) 경로**
-
-- `frontend/src/app/(dashboard)/admin/users/`
-- `frontend/src/app/login/`, `frontend/src/contexts/auth-context.tsx`
-- `frontend/src/lib/access-control.ts`, `menu-registry.ts`, `route-permissions.ts`
-- `frontend/src/app/(dashboard)/buyer-import/`
-- `backend/alembic/versions/0016–0018`
-- `scripts/dev_foreground.sh`
+로컬 helper: `Register GitHub SSH.command`, `scripts/register_github_ssh.sh`
 
 ---
 
@@ -179,7 +177,8 @@ Async upload 사용 시 별도 터미널: `make worker`
 |-------|------------|------|------|
 | **A** | 3–5일 | `dev.sh`, setup_local, Quickstart | **완료 (v1.1.1)** |
 | **B** | 1–2주 | Playwright smoke, `make test-smoke` | **완료 (v1.1.1)** |
-| **C** | 2–3주 | prod secret, deploy-qa, doc sync, upload cancel | **완료 (v1.1.2)** — [Deploy_Prep_Quickstart.md](./Deploy_Prep_Quickstart.md) |
+| **C** | 2–3주 | prod secret, deploy-qa, doc sync, upload cancel | **완료 (v1.1.2)** |
+| **D** | 1–2주 | QA deploy, LFS, E2E in CI, PG acceptance | **예정 (v1.2.0)** |
 
 **Phase A 권장 착수 순서:** 기준 고정 → dev.sh → reload/status → env template → E2E smoke
 
@@ -202,6 +201,7 @@ Async upload 사용 시 별도 터미널: `make worker`
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1.3 | 2026-07-23 | CI smoke fix, Upload cancel UI, doc sync, GitHub SSH helpers |
 | 1.1.2 | 2026-07-23 | Phase C — upload cancel API, deploy prep scripts, CI smoke job |
 | 1.1.1 | 2026-07-23 | Phase A/B — dev.sh, smoke/E2E tests |
 | 1.1.0 | 2026-07-23 | Initial status report — ORION nav, User Management, auth/RBAC, local pilot assessment |

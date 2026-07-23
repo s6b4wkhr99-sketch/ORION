@@ -201,6 +201,8 @@ export const api = {
       `/uploads/processing-profile${estimatedRows != null ? `?estimated_rows=${estimatedRows}` : ""}`,
     ),
   getUploadStatus: (uploadId: string) => fetchJson<UploadStatus>(`/upload/${uploadId}`),
+  cancelUpload: (uploadId: string) =>
+    fetchJson<UploadStatus>(`/upload/${uploadId}/cancel`, { method: "POST" }),
   previewUpload: async (file: File) => {
     const form = new FormData();
     form.append("file", file);

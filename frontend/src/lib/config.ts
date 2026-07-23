@@ -1,6 +1,6 @@
 export const APP_NAME = "ORION";
 export const APP_TAGLINE = "Campaign Decision Intelligence";
-export const APP_VERSION = "1.1.1";
+export const APP_VERSION = "1.1.3";
 
 import { hasModule, type PermissionModule } from "@/lib/access-control";
 

@@ -7,18 +7,20 @@ BACKEND="$ROOT/backend"
 DB_FILE="$BACKEND/.test_smoke.db"
 
 cd "$BACKEND"
-if [ ! -x ".venv/bin/python" ]; then
-  echo "ERROR: Run make setup-local first"
-  exit 1
+PYTHON="python3"
+if [ -x ".venv/bin/python" ]; then
+  # shellcheck disable=SC1091
+  . .venv/bin/activate
+  PYTHON="python"
 fi
 
 export DATABASE_URL="sqlite:///${DB_FILE}"
 export AUTH_REQUIRED=true
 export SKIP_PHYSICAL_SCHEMA=true
+export UPLOAD_ASYNC=true
 
 rm -f "$DB_FILE"
 trap 'rm -f "$DB_FILE"' EXIT
 
 echo "==> Running backend smoke tests (SQLite: .test_smoke.db)"
-. .venv/bin/activate
-python tests/test_smoke.py
+"$PYTHON" tests/test_smoke.py

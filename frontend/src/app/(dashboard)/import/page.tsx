@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Loader2 } from "lucide-react";
+import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { UploadDropZone } from "@/components/upload/upload-drop-zone";
 import { MappingReportPanel } from "@/components/upload/mapping-report";
 import { UPLOAD_STAGES, UploadProgressPanel, type UploadStage } from "@/components/upload/upload-progress";
@@ -42,6 +42,7 @@ export default function ImportPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [mappingReportOpen, setMappingReportOpen] = useState(false);
   const [recentUploads, setRecentUploads] = useState<UploadSummary[]>([]);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [systemHealth, setSystemHealth] = useState<{
     postgres?: boolean;
     readyFor2_5m?: boolean;
@@ -70,6 +71,26 @@ export default function ImportPage() {
   useEffect(() => {
     api.getUploads().then(setRecentUploads).catch(() => setRecentUploads([]));
   }, [step, result]);
+
+  const refreshRecentUploads = useCallback(() => {
+    api.getUploads().then(setRecentUploads).catch(() => setRecentUploads([]));
+  }, []);
+
+  const handleCancelUpload = useCallback(
+    async (uploadId: string) => {
+      setError(null);
+      setCancellingId(uploadId);
+      try {
+        await api.cancelUpload(uploadId);
+        refreshRecentUploads();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to cancel upload");
+      } finally {
+        setCancellingId(null);
+      }
+    },
+    [refreshRecentUploads],
+  );
 
   const canUpload = useMemo(() => preview != null && (preview.fatal_errors?.length ?? 0) === 0, [preview]);
 
@@ -313,12 +334,13 @@ export default function ImportPage() {
               <tr>
                 <th className="py-1 text-left">File</th>
                 <th className="py-1 text-right">Records</th>
+                <th className="py-1 text-right">Action</th>
               </tr>
             </thead>
             <tbody>
               {recentUploads.length === 0 ? (
                 <tr>
-                  <td colSpan={2} className="py-3 text-[var(--cios-secondary)]">
+                  <td colSpan={3} className="py-3 text-[var(--cios-secondary)]">
                     No uploads yet
                   </td>
                 </tr>
@@ -334,16 +356,38 @@ export default function ImportPage() {
                       <span
                         className={cn(
                           "inline-flex items-center gap-1",
-                          u.status === "completed" ? "text-[var(--cios-success)]" : u.status === "failed" ? "text-[var(--cios-error)]" : "text-[var(--cios-primary)]",
+                          u.status === "completed"
+                            ? "text-[var(--cios-success)]"
+                            : u.status === "failed"
+                              ? "text-[var(--cios-error)]"
+                              : u.status === "cancelled"
+                                ? "text-gray-500"
+                                : "text-[var(--cios-primary)]",
                         )}
                       >
                         {u.status === "processing" || u.status === "pending" ? (
                           <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : u.status === "cancelled" ? (
+                          <XCircle className="h-3 w-3" />
                         ) : (
                           <CheckCircle2 className="h-3 w-3" />
                         )}
                         {u.status}
                       </span>
+                    </td>
+                    <td className="py-2 text-right align-top">
+                      {u.status === "pending" ? (
+                        <button
+                          type="button"
+                          disabled={cancellingId === u.id}
+                          onClick={() => handleCancelUpload(u.id)}
+                          className="text-[var(--cios-error)] hover:underline disabled:opacity-50"
+                        >
+                          {cancellingId === u.id ? "Cancelling…" : "Cancel"}
+                        </button>
+                      ) : (
+                        <span className="text-[var(--cios-secondary)]">—</span>
+                      )}
                     </td>
                   </tr>
                 ))

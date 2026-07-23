@@ -85,6 +85,7 @@ make test-e2e    # dev 서버 + Playwright
 | Method | Path | 설명 |
 |--------|------|------|
 | `POST` | `/api/v1/upload/{upload_id}/cancel` | `pending` 업로드 취소 |
+| UI | Upload Center → Recent Uploads | **Cancel** 버튼 (v1.1.3) |
 
 `processing` / `completed` 상태는 취소 불가. Worker는 `cancelled` 항목을 건너뜁니다.
 

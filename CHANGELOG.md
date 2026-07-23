@@ -2,6 +2,27 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.1.3] — 2026-07-23
+
+### Summary
+
+CI smoke fix for GitHub Actions, Upload Center cancel UI, documentation sync, GitHub SSH helpers.
+
+### Features
+
+- Upload Center **Recent Uploads** — Cancel button for `pending` uploads (`POST /upload/{id}/cancel`)
+- `api.cancelUpload()` frontend client
+- `Register GitHub SSH.command` + `scripts/register_github_ssh.sh`, `push_github.sh`
+
+### Bug Fixes
+
+- `run_test_smoke.sh` — works without local `.venv` (CI uses system Python)
+- Smoke script sets `UPLOAD_ASYNC=true` consistently
+
+### Documentation
+
+- Volume 31 synced to v1.1.3 (GitHub remote, Phase A/B/C complete, maturity ~75%)
+
 ## [1.1.2] — 2026-07-23
 
 ### Summary

@@ -1,6 +1,6 @@
 # Local Operations Quickstart (로컬 운영 1페이지)
 
-**Version:** 1.1.2 · **Updated:** 2026-07-23
+**Version:** 1.1.3 · **Updated:** 2026-07-23
 
 Ceragem CIOS를 Mac에서 **로컬 네이티브**로 운영하는 공식 절차입니다.
 
