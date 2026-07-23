@@ -1,4 +1,4 @@
-.PHONY: postgres-up postgres-down setup-2_5m setup-local migrate init-postgres worker backend frontend dev dev-daemon dev-stop dev-status dev-restart test-phase3 backup restore archive-sqlite cleanup-storage nightly-maintenance weekly-maintenance storage-audit
+.PHONY: postgres-up postgres-down setup-2_5m setup-local migrate init-postgres worker backend frontend dev dev-daemon dev-stop dev-status dev-restart test-smoke test-e2e test-phase3 backup restore archive-sqlite cleanup-storage nightly-maintenance weekly-maintenance storage-audit
 
 # CURDIR — spaces in path break abspath/dir (e.g. "Website Project/...").
 ROOT := $(CURDIR)/
@@ -71,6 +71,12 @@ dev-restart:
 
 frontend-build:
 	cd "$(ROOT)frontend" && npm run build
+
+test-smoke:
+	bash "$(ROOT)scripts/run_test_smoke.sh"
+
+test-e2e:
+	cd "$(ROOT)frontend" && npm run test:e2e
 
 test-phase3:
 	cd "$(ROOT)backend" && . .venv/bin/activate && DATABASE_URL=$${DATABASE_URL:-postgresql+psycopg2://cios:cios_dev_password@127.0.0.1:5432/cios} python tests/test_phase3_postgres.py

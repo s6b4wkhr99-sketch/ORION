@@ -106,7 +106,20 @@ make restore
 
 ---
 
-## 9. 관련 문서
+## 9. Smoke tests (Phase B)
+
+Requires **running stack** for E2E (`bash scripts/dev.sh start`).
+
+```bash
+make test-smoke    # backend — SQLite .test_smoke.db (safe vs local PostgreSQL)
+make test-e2e      # frontend — Playwright (5 tests)
+```
+
+First-time E2E: `cd frontend && npm install && npx playwright install chromium`
+
+---
+
+## 11. 관련 문서
 
 - [Volume 31 — Development Status Report](./31_Development_Status_Report.md)
 - [CHANGELOG.md](../CHANGELOG.md)

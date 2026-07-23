@@ -27,5 +27,6 @@ backend/uploads/
 backend/backups/
 backend/archive/
 backend/reports/
+backend/.test_smoke.db
 *.log
 .dev/

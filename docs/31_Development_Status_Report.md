@@ -175,11 +175,11 @@ Async upload 사용 시 별도 터미널: `make worker`
 
 ## 7. 다음 개선 로드맵 (제안)
 
-| Phase | 기간 (1명) | 내용 |
-|-------|------------|------|
-| **A** | 3–5일 | `scripts/dev.sh` 단일화, dev-status 강화, setup_local.sh, README 운영 1페이지 |
-| **B** | 1–2주 | Playwright smoke 5–6개, CI frontend job, test DB 분리 |
-| **C** | 2–3주 | prod secret, deploy-qa, 문서↔UI 동기화 |
+| Phase | 기간 (1명) | 내용 | 상태 |
+|-------|------------|------|------|
+| **A** | 3–5일 | `dev.sh`, setup_local, Quickstart | **완료 (v1.1.1)** |
+| **B** | 1–2주 | Playwright smoke, `make test-smoke` | **완료 (v1.1.1)** |
+| **C** | 2–3주 | prod secret, deploy-qa, doc sync | 예정 |
 
 **Phase A 권장 착수 순서:** 기준 고정 → dev.sh → reload/status → env template → E2E smoke
 

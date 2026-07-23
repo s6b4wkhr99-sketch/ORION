@@ -2,6 +2,24 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.1.1] — 2026-07-23
+
+### Summary
+
+Phase B regression smoke tests: unified `dev.sh` local ops (1.1.0 follow-up) plus backend SQLite smoke and Playwright E2E.
+
+### Features
+
+- `scripts/dev.sh` — single local start/stop/status/restart entry point
+- `scripts/setup_local.sh` — first-time env and dependency setup
+- [Local_Operations_Quickstart.md](./docs/Local_Operations_Quickstart.md)
+- `make test-smoke` — backend auth/RBAC/user-delete on isolated SQLite
+- `make test-e2e` — Playwright smoke (login, Read Only banner, User Management UX, nav)
+
+### Documentation
+
+- Volume 31 and README updated for local ops workflow
+
 ## [1.1.0] — 2026-07-23
 
 ### Summary
