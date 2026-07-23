@@ -2,6 +2,26 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.3.0] — 2026-07-23
+
+### Summary
+
+Playwright E2E in CI, PostgreSQL acceptance job, production deploy workflow.
+
+### Features
+
+- CI **postgres-acceptance** job — alembic + init_postgres + Phase 3 PG tests
+- CI **e2e** job — Playwright 5 tests against live backend + frontend (`scripts/run_ci_e2e.sh`)
+- `make test-postgres`, `make test-ci-e2e` — local/CI parity
+- **Deploy Production** workflow (manual, `DEPLOY` confirm + production env secrets)
+- `deploy/scripts/deploy_production.sh`
+- [Deploy_Production_Guide.md](./docs/Deploy_Production_Guide.md)
+
+### Changed
+
+- Playwright CI retries → 2, expect timeout 15s
+- `docker-build` CI job waits for `e2e` + `test`
+
 ## [1.2.0] — 2026-07-23
 
 ### Summary

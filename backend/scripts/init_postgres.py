@@ -15,6 +15,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import settings
 from app.database import Base, SessionLocal, is_postgres_url
+import app.models  # noqa: F401 — register all ORM mappers before SessionLocal
 from app.processing.seed import seed_configuration
 from app.schema.apply import apply_physical_schema
 from app.schema.seed_v16 import seed_v16_reference_schema

@@ -1,6 +1,6 @@
 # Local Operations Quickstart (로컬 운영 1페이지)
 
-**Version:** 1.2.0 · **Updated:** 2026-07-23
+**Version:** 1.3.0 · **Updated:** 2026-07-23
 
 Ceragem CIOS를 Mac에서 **로컬 네이티브**로 운영하는 공식 절차입니다.
 
@@ -127,7 +127,9 @@ Requires **running stack** for E2E (`bash scripts/dev.sh start`).
 
 ```bash
 make test-smoke    # backend — SQLite .test_smoke.db (safe vs local PostgreSQL)
-make test-e2e      # frontend — Playwright (5 tests)
+make test-postgres # PostgreSQL migrate + Phase 3 (requires PG @ :5432)
+make test-e2e      # frontend — Playwright (5 tests, dev stack running)
+make test-ci-e2e   # start backend+frontend + Playwright (PG required)
 ```
 
 First-time E2E: `cd frontend && npm install && npx playwright install chromium`

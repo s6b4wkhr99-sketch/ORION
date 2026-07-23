@@ -1,4 +1,5 @@
 from app.models.raw import RawCustomerData, RawUpload
+from app.models.buyer import BuyerPurchase
 from app.models.mapping import FieldMapping
 from app.models.auto_mapping import (
     FieldAlias,
@@ -34,6 +35,7 @@ from app.models.v16_schema import (
 __all__ = [
     "RawUpload",
     "RawCustomerData",
+    "BuyerPurchase",
     "FieldMapping",
     "FieldMaster",
     "FieldAlias",

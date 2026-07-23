@@ -1,8 +1,8 @@
 # Volume 31 — Development Status Report (개발 현황 보고서)
 
-**Version:** 1.2.0  
+**Version:** 1.3.0  
 **Report Date:** 2026-07-23  
-**Status:** Local Native Pilot — Phase D (v1.2.0 QA deploy prep) complete  
+**Status:** CI E2E + PG acceptance + production deploy workflow (v1.3.0)  
 **Audience:** 개발자, PM, QA, 운영
 
 ---
@@ -23,8 +23,8 @@
 
 | 항목 | 값 |
 |------|-----|
-| **애플리케이션 버전** | **1.2.0** |
-| 이전 공식 릴리스 | 1.1.3 (2026-07-23) |
+| **애플리케이션 버전** | **1.3.0** |
+| 이전 공식 릴리스 | 1.2.0 (2026-07-23) |
 | Git | `main` @ GitHub [s6b4wkhr99-sketch/ORION](https://github.com/s6b4wkhr99-sketch/ORION) |
 | DB 마이그레이션 | Alembic `0018_user_allowed_modules` (head) |
 | Frontend | Next.js 16 · `http://127.0.0.1:3002` |
@@ -179,7 +179,7 @@ Async upload 사용 시 별도 터미널: `make worker`
 | **B** | 1–2주 | Playwright smoke, `make test-smoke` | **완료 (v1.1.1)** |
 | **C** | 2–3주 | prod secret, deploy-qa, doc sync, upload cancel | **완료 (v1.1.2)** |
 | **D** | 1–2주 | QA deploy, secrets validation, data assets, compose smoke | **완료 (v1.2.0)** — [Deploy_QA_Guide.md](./Deploy_QA_Guide.md) |
-| **E** | 1–2주 | E2E in CI, PG acceptance, prod deploy | **예정 (v1.3.0)** |
+| **E** | 1–2주 | E2E in CI, PG acceptance, prod deploy | **완료 (v1.3.0)** — [Deploy_Production_Guide.md](./Deploy_Production_Guide.md) |
 
 **Phase A 권장 착수 순서:** 기준 고정 → dev.sh → reload/status → env template → E2E smoke
 
@@ -202,6 +202,7 @@ Async upload 사용 시 별도 터미널: `make worker`
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.3.0 | 2026-07-23 | E2E in CI, PostgreSQL acceptance, production deploy workflow |
 | 1.2.0 | 2026-07-23 | QA deploy workflow, secret validation, data assets out of Git, compose smoke |
 | 1.1.3 | 2026-07-23 | CI smoke fix, Upload cancel UI, doc sync, GitHub SSH helpers |
 | 1.1.2 | 2026-07-23 | Phase C — upload cancel API, deploy prep scripts, CI smoke job |

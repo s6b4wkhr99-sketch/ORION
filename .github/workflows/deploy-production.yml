@@ -1,0 +1,59 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Production validation URL (nginx)
+        required: true
+        default: "https://cios.company.com"
+      confirm:
+        description: Type DEPLOY to confirm production deploy
+        required: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Confirm production deploy
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "DEPLOY" ]; then
+            echo "Confirmation failed — set confirm input to DEPLOY"
+            exit 1
+          fi
+      - name: Validate production compose config
+        run: bash scripts/validate_compose_staging.sh deploy/env/production.env
+      - name: Validate production env (must not use placeholders)
+        run: bash scripts/validate_deploy_env.sh deploy/env/production.env production
+
+  deploy-production:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production host via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.PROD_HOST }}
+          username: ${{ secrets.PROD_SSH_USER }}
+          key: ${{ secrets.PROD_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.PROD_APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then APP_DIR="/opt/orion"; fi
+            cd "$APP_DIR"
+            git fetch origin main
+            git checkout main
+            git pull origin main
+            export CIOS_APP_DIR="$APP_DIR"
+            export CIOS_ENV_FILE="$APP_DIR/deploy/env/production.env"
+            export CIOS_BASE_URL="${{ github.event.inputs.base_url }}"
+            bash deploy/scripts/deploy_production.sh
+
+      - name: Post-deploy validation
+        env:
+          CIOS_BASE_URL: ${{ github.event.inputs.base_url }}
+        run: bash deploy/scripts/deploy_validate.sh
