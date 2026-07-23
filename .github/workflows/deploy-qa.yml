@@ -1,0 +1,61 @@
+name: Deploy QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: QA validation URL (nginx)
+        required: false
+        default: "http://127.0.0.1:8080"
+
+# Requires GitHub environment "qa" with secrets:
+#   QA_HOST, QA_SSH_USER, QA_SSH_KEY, QA_APP_DIR (optional)
+
+jobs:
+  validate-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate QA compose config
+        run: bash scripts/validate_compose_staging.sh deploy/env/qa.env
+
+      - name: Validate QA env (warnings OK)
+        run: bash scripts/validate_deploy_env.sh deploy/env/qa.env qa
+
+  deploy-qa:
+    needs: validate-config
+    runs-on: ubuntu-latest
+    environment: qa
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to QA host via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.QA_HOST }}
+          username: ${{ secrets.QA_SSH_USER }}
+          key: ${{ secrets.QA_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            APP_DIR="${{ secrets.QA_APP_DIR }}"
+            if [ -z "$APP_DIR" ]; then APP_DIR="/opt/orion"; fi
+            cd "$APP_DIR"
+            git fetch origin main
+            git checkout main
+            git pull origin main
+            export CIOS_APP_DIR="$APP_DIR"
+            export CIOS_ENV_FILE="$APP_DIR/deploy/env/qa.env"
+            export CIOS_BASE_URL="${{ github.event.inputs.base_url }}"
+            bash deploy/scripts/deploy_qa.sh
+
+      - name: Post-deploy validation (from runner if QA is reachable)
+        continue-on-error: true
+        env:
+          CIOS_BASE_URL: ${{ secrets.QA_PUBLIC_URL }}
+        run: |
+          if [ -n "$CIOS_BASE_URL" ]; then
+            bash deploy/scripts/deploy_validate.sh
+          else
+            echo "QA_PUBLIC_URL not set — skip external validation"
+          fi

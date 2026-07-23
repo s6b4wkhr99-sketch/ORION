@@ -1,4 +1,4 @@
-.PHONY: postgres-up postgres-down setup-2_5m setup-local migrate init-postgres worker backend frontend dev dev-daemon dev-stop dev-status dev-restart test-smoke test-e2e test-phase3 backup backup-release restore archive-sqlite cleanup-storage nightly-maintenance weekly-maintenance storage-audit validate-compose
+.PHONY: postgres-up postgres-down setup-2_5m setup-local setup-data migrate init-postgres worker backend frontend dev dev-daemon dev-stop dev-status dev-restart test-smoke test-e2e test-phase3 backup backup-release restore archive-sqlite cleanup-storage nightly-maintenance weekly-maintenance storage-audit validate-compose compose-staging-smoke validate-deploy-env generate-secrets
 
 # CURDIR — spaces in path break abspath/dir (e.g. "Website Project/...").
 ROOT := $(CURDIR)/
@@ -89,6 +89,18 @@ backup-release:
 
 validate-compose:
 	bash "$(ROOT)scripts/validate_compose_staging.sh"
+
+compose-staging-smoke:
+	bash "$(ROOT)scripts/compose_staging_smoke.sh"
+
+validate-deploy-env:
+	bash "$(ROOT)scripts/validate_deploy_env.sh" "$(ROOT)deploy/env/production.env" production
+
+generate-secrets:
+	bash "$(ROOT)scripts/generate_secrets.sh"
+
+setup-data:
+	bash "$(ROOT)scripts/setup_data_assets.sh"
 
 restore:
 	bash "$(ROOT)scripts/restore_local.sh" --latest --yes

@@ -30,3 +30,12 @@ backend/reports/
 backend/.test_smoke.db
 *.log
 .dev/
+
+# Large Census/ACS assets (v1.2.0+) — run: make setup-data
+backend/data/geo/cb_2020_us_zcta520_500k.zip
+backend/data/geo/cb_2020_us_zcta520_500k.shp
+backend/data/geo/cb_2020_us_zcta520_500k.dbf
+backend/data/geo/cb_2020_us_zcta520_500k.shx
+backend/data/geo/cb_2020_us_zcta520_500k.prj
+backend/data/geo/cb_2020_us_zcta520_500k.cpg
+backend/data/acs/acs2022_5yr_geography.dat

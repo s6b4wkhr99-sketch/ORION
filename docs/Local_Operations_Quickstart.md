@@ -1,6 +1,6 @@
 # Local Operations Quickstart (로컬 운영 1페이지)
 
-**Version:** 1.1.3 · **Updated:** 2026-07-23
+**Version:** 1.2.0 · **Updated:** 2026-07-23
 
 Ceragem CIOS를 Mac에서 **로컬 네이티브**로 운영하는 공식 절차입니다.
 
@@ -106,7 +106,22 @@ make restore
 
 ---
 
-## 9. Smoke tests (Phase B)
+## 5. 대용량 데이터 (v1.2.0+)
+
+Git에 포함되지 않는 Census/ACS 파일 — **clone 후 1회:**
+
+```bash
+make setup-data
+```
+
+| 파일 | 용도 |
+|------|------|
+| `cb_2020_us_zcta520_500k.zip` | ZCTA choropleth maps |
+| `acs2022_5yr_geography.dat` | ZIP income import |
+
+---
+
+## 6. Smoke tests (Phase B)
 
 Requires **running stack** for E2E (`bash scripts/dev.sh start`).
 

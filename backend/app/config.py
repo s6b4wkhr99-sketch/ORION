@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # Application
-    app_version: str = "1.1.3"
+    app_version: str = "1.2.0"
     environment: str = "development"
     debug: bool = True
     log_level: str = "INFO"

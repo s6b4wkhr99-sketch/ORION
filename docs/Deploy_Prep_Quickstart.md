@@ -69,7 +69,10 @@ docker compose --env-file deploy/env/staging.env down
 |------|------|
 | GitHub Actions `smoke` job | `make test-smoke` (PR/push) |
 | Full acceptance (`test` job) | 기존 Volume 12/13 |
-| `deploy-qa` | 시크릿·러너 준비 후 workflow 활성화 |
+| `deploy-qa` | **활성화 (v1.2.0)** — GitHub Environment `qa` + secrets 필요 |
+| `make setup-data` | Census/ACS 대용량 파일 다운로드 |
+| `make generate-secrets` | JWT/DB password 생성 |
+| `make compose-staging-smoke` | Docker full stack 검증 |
 
 로컬에서 CI와 동일 smoke:
 

@@ -2,6 +2,28 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.2.0] — 2026-07-23
+
+### Summary
+
+QA/staging deploy pipeline, production secret validation, large data assets moved out of Git, Docker compose CI checks.
+
+### Features
+
+- `scripts/generate_secrets.sh` — JWT + PostgreSQL password generation
+- `scripts/validate_deploy_env.sh` — production/staging/qa env validation profiles
+- `scripts/setup_data_assets.sh` + `make setup-data` — download Census ZCTA + ACS files
+- `scripts/compose_staging_smoke.sh` + `make compose-staging-smoke` — Docker up → validate → down
+- `deploy/scripts/deploy_qa.sh` — QA host deploy script
+- GitHub Actions **Deploy QA** workflow (`.github/workflows/deploy-qa.yml`)
+- CI **staging-config** job — compose + env template validation
+- [Deploy_QA_Guide.md](./docs/Deploy_QA_Guide.md)
+
+### Changed
+
+- Large geo/ACS files (87–93 MB) removed from Git tracking — use `make setup-data` after clone
+- `deploy/env/*` APP_VERSION → 1.2.0
+
 ## [1.1.3] — 2026-07-23
 
 ### Summary

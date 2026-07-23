@@ -60,9 +60,22 @@ jobs:
           pip install pip-audit
           pip-audit -r backend/requirements.txt || true
 
+  staging-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate staging & QA compose configs
+        run: |
+          bash scripts/validate_compose_staging.sh deploy/env/staging.env
+          bash scripts/validate_compose_staging.sh deploy/env/qa.env
+      - name: Validate deploy env templates
+        run: |
+          bash scripts/validate_deploy_env.sh deploy/env/qa.env qa
+          bash scripts/validate_deploy_env.sh deploy/env/development.env development
+
   docker-build:
     runs-on: ubuntu-latest
-    needs: test
+    needs: [test, staging-config]
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
