@@ -22,7 +22,7 @@ from app.acquisition.buyer_upload import (
 )
 from app.campaign.buyer_gap_service import run_upload_gap_analysis
 from app.acquisition.upload_profile import get_upload_processing_profile
-from app.acquisition.upload_queue import enqueue_customer_upload, get_upload_status, upload_status_payload
+from app.acquisition.upload_queue import cancel_upload, enqueue_customer_upload, get_upload_status, upload_status_payload
 from app.api.auth import login, refresh
 from app.api.deps import (
     get_current_user,
@@ -338,6 +338,27 @@ def upload_detail(upload_id: str, db: Session = Depends(get_db), _user: dict = D
     data = get_upload_status(db, upload_id)
     if not data:
         raise HTTPException(status_code=404, detail={"success": False, "message": "Upload not found"})
+    return ok(data)
+
+
+@router.post("/upload/{upload_id}/cancel")
+def cancel_upload_route(upload_id: str, db: Session = Depends(get_db), user: dict = Depends(require_upload)):
+    try:
+        data = cancel_upload(db, upload_id)
+    except ValueError as e:
+        msg = str(e)
+        code = 404 if "not found" in msg.lower() else 400
+        raise HTTPException(status_code=code, detail={"success": False, "message": msg}) from e
+    record_audit(
+        db,
+        action="cancel_upload",
+        user_id=user.get("email"),
+        role=user.get("role"),
+        entity_type="upload",
+        entity_id=upload_id,
+        ip_address=user.get("ip_address"),
+        browser=user.get("browser"),
+    )
     return ok(data)
 
 

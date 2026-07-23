@@ -1,6 +1,6 @@
 # Local Operations Quickstart (로컬 운영 1페이지)
 
-**Version:** 1.1.0 · **Updated:** 2026-07-23
+**Version:** 1.1.2 · **Updated:** 2026-07-23
 
 Ceragem CIOS를 Mac에서 **로컬 네이티브**로 운영하는 공식 절차입니다.
 
@@ -119,8 +119,9 @@ First-time E2E: `cd frontend && npm install && npx playwright install chromium`
 
 ---
 
-## 11. 관련 문서
+## 10. 관련 문서
 
 - [Volume 31 — Development Status Report](./31_Development_Status_Report.md)
+- [Deploy Prep Quickstart (Phase C)](./Deploy_Prep_Quickstart.md)
 - [CHANGELOG.md](../CHANGELOG.md)
 - [Volume 27 — As-Built](./27_Development_Completion_Specification.md)

@@ -1,8 +1,8 @@
 # Volume 31 — Development Status Report (개발 현황 보고서)
 
-**Version:** 1.1.0  
+**Version:** 1.1.2  
 **Report Date:** 2026-07-23  
-**Status:** Local Native Pilot (로컬 네이티브 파일럿)  
+**Status:** Local Native Pilot (로컬 네이티브 파일럿) — Phase A/B/C complete  
 **Audience:** 개발자, PM, QA, 운영
 
 ---
@@ -151,10 +151,10 @@ Async upload 사용 시 별도 터미널: `make worker`
 | 2 | Backend 코드 변경 후 stale API (reload 전) | 405 Method Not Allowed 등 | 서버 재시작 또는 `--reload` |
 | 3 | `window.prompt` / `confirm` 일부 환경 미동작 | Reset password (구) | Role menu preview 비밀번호 필드로 대체 |
 | 4 | Upload list API — upload 권한 필요 | Read Only 403 | v1.1.0에서 배너 suppress |
-| 5 | 프론트 E2E 테스트 없음 | 회귀 수동 확인 | Phase B 로드맵 |
-| 6 | 로컬 PG vs CI SQLite 테스트 불일치 | `make test` 로컬 주의 | test DB 분리 예정 |
-| 7 | Upload cancel API 미구현 | Volume 27 §16 | 미착수 |
-| 8 | 다중 dev 시작 스크립트 | 혼란 | Phase A 단일화 예정 |
+| 5 | 프론트 E2E 테스트 없음 | 회귀 수동 확인 | **완료 (v1.1.1)** — `make test-e2e` |
+| 6 | 로컬 PG vs CI SQLite 테스트 불일치 | `make test` 로컬 주의 | `make test-smoke` SQLite 분리 (v1.1.1) |
+| 7 | Upload cancel API 미구현 | Volume 27 §16 | **완료 (v1.1.2)** — `POST /upload/{id}/cancel` |
+| 8 | 다중 dev 시작 스크립트 | 혼란 | **완료 (v1.1.1)** — `scripts/dev.sh` |
 
 ---
 
@@ -179,7 +179,7 @@ Async upload 사용 시 별도 터미널: `make worker`
 |-------|------------|------|------|
 | **A** | 3–5일 | `dev.sh`, setup_local, Quickstart | **완료 (v1.1.1)** |
 | **B** | 1–2주 | Playwright smoke, `make test-smoke` | **완료 (v1.1.1)** |
-| **C** | 2–3주 | prod secret, deploy-qa, doc sync | 예정 |
+| **C** | 2–3주 | prod secret, deploy-qa, doc sync, upload cancel | **완료 (v1.1.2)** — [Deploy_Prep_Quickstart.md](./Deploy_Prep_Quickstart.md) |
 
 **Phase A 권장 착수 순서:** 기준 고정 → dev.sh → reload/status → env template → E2E smoke
 
@@ -202,4 +202,6 @@ Async upload 사용 시 별도 터미널: `make worker`
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.1.2 | 2026-07-23 | Phase C — upload cancel API, deploy prep scripts, CI smoke job |
+| 1.1.1 | 2026-07-23 | Phase A/B — dev.sh, smoke/E2E tests |
 | 1.1.0 | 2026-07-23 | Initial status report — ORION nav, User Management, auth/RBAC, local pilot assessment |

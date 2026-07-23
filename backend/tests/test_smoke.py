@@ -1,5 +1,6 @@
 """Fast smoke tests — isolated SQLite DB (safe alongside local PostgreSQL)."""
 
+import io
 import os
 import sys
 
@@ -7,11 +8,13 @@ import sys
 os.environ.setdefault("DATABASE_URL", "sqlite:///./.test_smoke.db")
 os.environ.setdefault("AUTH_REQUIRED", "true")
 os.environ.setdefault("SKIP_PHYSICAL_SCHEMA", "true")
+os.environ.setdefault("UPLOAD_ASYNC", "true")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi.testclient import TestClient
 
+from app.acquisition.upload_queue import run_worker_cycle
 from app.database import Base, SessionLocal, engine
 from app.main import app
 from app.processing.seed import seed_configuration
@@ -85,8 +88,33 @@ def run_tests() -> None:
     assert r.status_code == 200
     paths = r.json().get("paths", {})
     assert "delete" in paths.get("/api/v1/admin/users/{email}", {})
+    assert "post" in paths.get("/api/v1/upload/{upload_id}/cancel", {})
 
-    print("✓ CIOS smoke tests passed (auth, RBAC, user admin, delete route)")
+    csv = "Email,State,ZIP Code\ncancel@test.com,NJ,07650\n"
+    upload = client.post(
+        "/api/v1/customers/upload",
+        files={"file": ("cancel-smoke.csv", io.BytesIO(csv.encode()), "text/csv")},
+        headers=admin_headers,
+    )
+    assert upload.status_code == 200, upload.text
+    upload_id = upload.json()["data"]["uploadId"]
+    assert upload.json()["data"]["status"] == "pending"
+
+    cancel = client.post(f"/api/v1/upload/{upload_id}/cancel", headers=admin_headers)
+    assert cancel.status_code == 200, cancel.text
+    assert cancel.json()["data"]["status"] == "cancelled"
+
+    again = client.post(f"/api/v1/upload/{upload_id}/cancel", headers=admin_headers)
+    assert again.status_code == 200
+    assert again.json()["data"]["status"] == "cancelled"
+
+    db = SessionLocal()
+    try:
+        assert run_worker_cycle(db) is False
+    finally:
+        db.close()
+
+    print("✓ CIOS smoke tests passed (auth, RBAC, user admin, delete route, upload cancel)")
 
 
 if __name__ == "__main__":

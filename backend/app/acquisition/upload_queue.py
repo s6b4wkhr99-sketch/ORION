@@ -110,6 +110,9 @@ def claim_next_pending_upload(db: Session) -> RawUpload | None:
     )
     if not upload:
         return None
+    db.refresh(upload)
+    if upload.status != "pending":
+        return None
     upload.status = "processing"
     upload.summary_json = json.dumps(
         {
@@ -130,6 +133,33 @@ def claim_next_upload(db: Session) -> RawUpload | None:
     if resumed:
         return resumed
     return claim_next_pending_upload(db)
+
+
+def cancel_upload(db: Session, upload_id: str) -> dict:
+    """Cancel a pending upload. Processing uploads cannot be cancelled."""
+    try:
+        uid = uuid.UUID(upload_id)
+    except ValueError as exc:
+        raise ValueError("Invalid upload id") from exc
+    upload = db.query(RawUpload).filter(RawUpload.upload_id == uid).first()
+    if not upload:
+        raise ValueError("Upload not found")
+    if upload.status == "pending":
+        upload.status = "cancelled"
+        summary: dict = {}
+        if upload.summary_json:
+            try:
+                summary = json.loads(upload.summary_json)
+            except json.JSONDecodeError:
+                summary = {}
+        summary["cancelled_at"] = now_app_iso()
+        upload.summary_json = json.dumps(summary)
+        db.commit()
+        db.refresh(upload)
+        return upload_status_payload(upload)
+    if upload.status == "cancelled":
+        return upload_status_payload(upload)
+    raise ValueError(f"Cannot cancel upload with status '{upload.status}'")
 
 
 def mark_upload_failed(db: Session, upload: RawUpload, message: str) -> None:

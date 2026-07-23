@@ -2,6 +2,25 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.1.2] — 2026-07-23
+
+### Summary
+
+Phase C deploy prep: upload cancel API, release backup script, CI smoke job, staging compose validation, deploy quickstart.
+
+### Features
+
+- `POST /api/v1/upload/{upload_id}/cancel` — cancel pending async uploads (Volume 27 §16)
+- `scripts/backup_release.sh` — versioned `git archive` ZIP for iCloud/offline backup
+- `scripts/setup_remote.sh` — configure Git `origin` for first push
+- `scripts/validate_compose_staging.sh` — validate Docker Compose staging config
+- GitHub Actions `smoke` job runs `make test-smoke` before full acceptance tests
+- [Deploy_Prep_Quickstart.md](./docs/Deploy_Prep_Quickstart.md)
+
+### Bug Fixes
+
+- Worker skips uploads cancelled while still `pending` (refresh before claim)
+
 ## [1.1.1] — 2026-07-23
 
 ### Summary
@@ -53,7 +72,6 @@ ORION navigation UX, full User Management (RBAC, per-menu access, password reset
 
 - Local dev requires PostgreSQL, optional upload worker, and keeping the CIOS Terminal window open
 - Frontend automated E2E tests not yet implemented
-- Multiple overlapping dev startup scripts (consolidation planned — Volume 31 §7)
 - Upload cancel API still not implemented (carried from v1.0.1)
 
 ## [1.0.1] — 2026-07-08

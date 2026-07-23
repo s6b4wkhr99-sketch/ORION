@@ -490,7 +490,7 @@ make test-phase3                  # PostgreSQL 전용 테스트
 
 | 항목 | 설명 |
 |------|------|
-| 업로드 취소 API | `POST /upload/{id}/cancel` 미구현 — DB `pending`/`processing` 수동 변경 또는 Worker 중지 필요 |
+| 업로드 취소 API | `POST /api/v1/upload/{id}/cancel` — `pending` 상태만 취소 가능 (v1.1.2) |
 | Frontend Admin | TypeScript 빌드 경고 (핵심 워크플로우와 무관) |
 | 브라우저 업로드 타임아웃 | 대용량 파일은 async + Worker 사용 권장; proxy timeout 시 Recent Uploads에서 확인 |
 | Recent Uploads 키 중복 | 동일 시각 업로드 시 React key 경고 (표시용, 기능 영향 없음) |
