@@ -3,10 +3,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-USB_ROOT="${USB_ROOT:-/Volumes/LeFrame_Dev/ORION-v1.5.0}"
+USB_ROOT="${USB_ROOT:-/Volumes/LeFrame_Dev/ORION-v1.5.1}"
 DOCS="$USB_ROOT/docs"
 SRC="$ROOT/docs/Other_Mac_Native_Troubleshooting.md"
 OPS="$ROOT/docs/Other_Mac_Operations_Guide.md"
+UPGRADE="$ROOT/docs/Other_Mac_InPlace_Upgrade_Guide.md"
+RUNBOOK="$ROOT/docs/Other_Mac_Install_Runbook.md"
 DISK="$ROOT/docs/Local_Disk_Cleanup_Guide.md"
 QUICKSTART="$ROOT/docs/Local_Operations_Quickstart.md"
 INSTALL="$ROOT/packaging/usb-docs/START-HERE-INSTALL-OPTIONS.txt"
@@ -21,6 +23,8 @@ fi
 mkdir -p "$DOCS"
 cp "$SRC" "$DOCS/Other_Mac_Native_Troubleshooting.md"
 cp "$OPS" "$DOCS/Other_Mac_Operations_Guide.md"
+cp "$UPGRADE" "$DOCS/Other_Mac_InPlace_Upgrade_Guide.md"
+cp "$RUNBOOK" "$DOCS/Other_Mac_Install_Runbook.md"
 cp "$DISK" "$DOCS/Local_Disk_Cleanup_Guide.md"
 cp "$QUICKSTART" "$DOCS/Local_Operations_Quickstart.md"
 cp "$INSTALL" "$USB_ROOT/START-HERE-INSTALL-OPTIONS.txt"

@@ -1,7 +1,7 @@
 # ORION — 다른 Mac 설치 실행 순서 (터미널 Runbook)
 
 **Version:** 1.5.0 · **Updated:** 2026-07-28  
-**Package:** `/Volumes/LeFrame_Dev/ORION-v1.5.0`  
+**Package:** `/Volumes/LeFrame_Dev/ORION-v1.5.1`  
 **대상:** USB에서 소스를 복사해 **다른 Mac**에 설치·기동할 때 (설치 담당자가 직접 수행)
 
 이 문서는 **위에서 아래로 번호 순서대로** Terminal에 붙여 넣으면 됩니다.  
@@ -28,7 +28,7 @@
 
 ```bash
 # 0-1) USB 마운트 확인
-ls /Volumes/LeFrame_Dev/ORION-v1.5.0/source/Makefile
+ls /Volumes/LeFrame_Dev/ORION-v1.5.1/source/Makefile
 
 # 0-2) Homebrew
 brew --version
@@ -41,7 +41,7 @@ df -h ~
 
 | 증상 | 원인 | 해결 |
 |------|------|------|
-| `No such file` (USB) | USB 미연결·이름 다름 | Finder에서 `LeFrame_Dev` 확인. 폴더명이 `ORION-v1.5.0`인지 확인 |
+| `No such file` (USB) | USB 미연결·이름 다름 | Finder에서 `LeFrame_Dev` 확인. 폴더명이 `ORION-v1.5.1`인지 확인 |
 | `brew: command not found` | Homebrew 없음 | https://brew.sh 설치 후 터미널 재실행 |
 | 디스크 부족 | 복원·`.next`·venv | Option B로 전환하거나 불필요 파일 삭제 |
 
@@ -65,7 +65,7 @@ brew install python@3.12 postgresql@16 node
 ### 실행 — Option A (DB 포함)
 
 ```bash
-PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
 
 cp -R "$PKG/source" ~/ORION
 mkdir -p ~/ORION/backend/backups
@@ -79,7 +79,7 @@ ls backend/backups/*/database.sql.gz
 ### 실행 — Option B (소스만)
 
 ```bash
-PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
 
 cp -R "$PKG/source" ~/ORION
 # backups/ 는 복사하지 않음
@@ -91,7 +91,7 @@ ls Makefile backend frontend
 **(선택) Option B에서 uploads 생략 — 복사 시간·용량 절약**
 
 ```bash
-PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
 rm -rf ~/ORION
 mkdir -p ~/ORION
 rsync -a \
@@ -361,7 +361,7 @@ EOF
 | 증상 | 원인 | 해결 |
 |------|------|------|
 | `Failed to fetch` / CORS | `localhost`가 아닌 다른 IP로 접속 | **`http://127.0.0.1:3002`** 사용 |
-| Mission Control / Opportunity Finder **Load failed** | customers=0 · migrate 누락 · 첫 로딩 지연 | 아래 「Load failed 복구」 |
+| Mission Control / Opportunity Finder **Load failed** | customers=0 · migrate 누락 · 첫 로딩 지연 | 아래 「Load failed 복구」; **업로드 완료 후 v1.5.1 업그레이드** → [Other_Mac_InPlace_Upgrade_Guide.md](./Other_Mac_InPlace_Upgrade_Guide.md) |
 | 로그인은 되는데 메뉴 없음 | RBAC | `/admin/users`에서 모듈 권한 (설치자 Admin만) |
 | SKU 가격이 원 Mac과 다름 | DB 카탈로그가 백업 시점 | Admin → **SKU Catalog** → 필요 시 **Save & Publish** |
 
@@ -471,7 +471,7 @@ bash scripts/dev.sh restart
 ### Option A (Full Migration)
 
 ```bash
-PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
 cp -R "$PKG/source" ~/ORION
 mkdir -p ~/ORION/backend/backups
 cp -R "$PKG/backups/"* ~/ORION/backend/backups/
@@ -499,7 +499,7 @@ bash scripts/dev.sh start --with-worker
 ### Option B (System First)
 
 ```bash
-PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
 cp -R "$PKG/source" ~/ORION
 cd ~/ORION
 
@@ -517,6 +517,7 @@ bash scripts/dev.sh start --with-worker
 | 문서 | 용도 |
 |------|------|
 | **본 문서** `Other_Mac_Install_Runbook.md` | 번호 순 설치 + 단계별 Troubleshooting |
+| `Other_Mac_InPlace_Upgrade_Guide.md` | **업로드 완료 Mac** — 데이터 유지 + v1.5.1 업그레이드 + Load failed |
 | `Other_Mac_Operations_Guide.md` | 옵션 설명·구조·운영 배경 |
 | `Other_Mac_Native_Troubleshooting.md` | 상황별 심화 트러블슈팅 |
 | `Local_Operations_Quickstart.md` | 원 Mac 일상 운영 1페이지 |

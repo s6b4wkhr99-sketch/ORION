@@ -1,11 +1,13 @@
 # ORION — 다른 Mac 설치·운영 가이드 (LeFrame_Dev USB)
 
 **Version:** 1.5.0 · **Updated:** 2026-07-28  
-**Package:** `LeFrame_Dev` USB · **`ORION-v1.5.0`** (only)  
+**Package:** `LeFrame_Dev` USB · **`ORION-v1.5.1`** (only)  
 **GitHub:** https://github.com/s6b4wkhr99-sketch/ORION
 
 > **터미널 번호 순 설치 (권장):**  
-> **[Other_Mac_Install_Runbook.md](./Other_Mac_Install_Runbook.md)** — 0→1→2→3→4A/4B→5→6 순서 + 단계별 **주의 & Troubleshooting**
+> **[Other_Mac_Install_Runbook.md](./Other_Mac_Install_Runbook.md)** — 0→1→2→3→4A/4B→5→6 순서 + 단계별 **주의 & Troubleshooting**  
+> **이미 설치·업로드 완료 + Load failed / v1.5.1 업그레이드:**  
+> **[Other_Mac_InPlace_Upgrade_Guide.md](./Other_Mac_InPlace_Upgrade_Guide.md)** — DB 유지, 코드만 교체
 
 ---
 
@@ -82,8 +84,8 @@ ORION을 다른 Mac에 옮길 때 **목적에 따라** 아래 두 방식 중 하
 USB에서 **직접 실행하지 마세요.** 로컬 SSD로 복사합니다.
 
 ```bash
-# 버전 폴더명은 USB에 맞게 변경 (예: ORION-v1.3.1, ORION-v1.5.0)
-PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+# 버전 폴더명은 USB에 맞게 변경 (예: ORION-v1.3.1, ORION-v1.5.1)
+PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
 
 cp -R "$PKG/source" ~/ORION
 mkdir -p ~/ORION/backend/backups
@@ -168,7 +170,7 @@ bash scripts/dev.sh start --with-worker
 ### 3.1 Step 1 — 소스만 복사
 
 ```bash
-PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
 
 cp -R "$PKG/source" ~/ORION
 # backups/ 는 복사하지 않음

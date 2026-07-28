@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USB_MOUNT="${USB_MOUNT:-/Volumes/LeFrame_Dev}"
-VERSION="${USB_VERSION:-1.5.0}"
+VERSION="${USB_VERSION:-1.5.1}"
 USB_ROOT="${USB_ROOT:-$USB_MOUNT/ORION-v$VERSION}"
 PREV_USB="${PREV_USB:-$USB_MOUNT/ORION-v1.5.0}"
 LATEST_BACKUP="$(find "$ROOT/backend/backups" -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sort | tail -1 || true)"
@@ -43,7 +43,22 @@ if [ "$REFRESH_ONLY" != "1" ]; then
     "$ROOT/" "$USB_ROOT/source/"
 else
   echo "==> Refreshing ORION v$VERSION on $USB_ROOT"
-  mkdir -p "$USB_ROOT"/{backups,docs,canvas}
+  mkdir -p "$USB_ROOT"/{source,backups,docs,canvas}
+  echo "==> Syncing source (full refresh)..."
+  rsync -a \
+    --exclude 'node_modules/' \
+    --exclude '.next/' \
+    --exclude 'out/' \
+    --exclude 'dist/' \
+    --exclude '.venv/' \
+    --exclude 'venv/' \
+    --exclude '__pycache__/' \
+    --exclude '.dev/' \
+    --exclude '.DS_Store' \
+    --exclude '*.log' \
+    --exclude 'backend/.test_smoke.db' \
+    --exclude 'backend/backups/' \
+    "$ROOT/" "$USB_ROOT/source/"
 fi
 
 echo "==> Copying PostgreSQL backups..."
@@ -91,6 +106,8 @@ fi
 
 echo "==> Copying docs..."
 cp "$ROOT/docs/Local_Operations_Quickstart.md" "$USB_ROOT/docs/"
+cp "$ROOT/docs/Other_Mac_Install_Runbook.md" "$USB_ROOT/docs/"
+cp "$ROOT/docs/Other_Mac_InPlace_Upgrade_Guide.md" "$USB_ROOT/docs/"
 cp "$ROOT/docs/Other_Mac_Native_Troubleshooting.md" "$USB_ROOT/docs/"
 cp "$ROOT/docs/Other_Mac_Operations_Guide.md" "$USB_ROOT/docs/"
 cp "$ROOT/docs/Local_Disk_Cleanup_Guide.md" "$USB_ROOT/docs/"
@@ -155,6 +172,8 @@ Login: http://127.0.0.1:3002/login · user@company.com / Ceragem2026!Adm
 FULL DOCUMENTATION
 ------------------
 START-HERE-INSTALL-OPTIONS.txt
+docs/Other_Mac_Install_Runbook.md
+docs/Other_Mac_InPlace_Upgrade_Guide.md   (upgrade with uploaded data — no restore)
 docs/Other_Mac_Operations_Guide.md
 docs/Other_Mac_Native_Troubleshooting.md
 README-USB.md
@@ -235,6 +254,8 @@ bash scripts/dev.sh start --with-worker
 
 | 문서 | 용도 |
 |------|------|
+| \`docs/Other_Mac_Install_Runbook.md\` | **번호 순 설치 (Option A/B)** |
+| \`docs/Other_Mac_InPlace_Upgrade_Guide.md\` | **업로드 완료 Mac — v1.5.1 업그레이드 (DB 유지)** |
 | \`docs/Other_Mac_Operations_Guide.md\` | **설치 옵션 상세 (본 가이드)** |
 | \`docs/Other_Mac_Native_Troubleshooting.md\` | 문제 발생 시 상황별 해결 |
 | \`docs/Local_Operations_Quickstart.md\` | 1페이지 운영 요약 |
@@ -246,6 +267,11 @@ cat > "$USB_ROOT/USB-CHANGES.md" <<EOF
 # USB Package Changes — v$VERSION ($PACKAGED_AT)
 
 Compared to **ORION-v1.3.1** on the same USB drive.
+
+## v1.5.1 — In-place upgrade guide & full USB refresh
+
+- \`docs/Other_Mac_InPlace_Upgrade_Guide.md\` — Option B Mac with uploaded data + Load failed → upgrade without \`make restore\`
+- Install runbook cross-links; USB folder \`ORION-v1.5.1\` only
 
 ## v1.5.0 — Purchase Intelligence & Buyer Upload
 

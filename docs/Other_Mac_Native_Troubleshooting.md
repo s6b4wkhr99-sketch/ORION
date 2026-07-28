@@ -6,7 +6,7 @@
 이 문서는 실제 다른 Mac(Les-Mac-Pro) 세팅·운영 중 발생한 문제를 **상황별**로 정리했습니다.  
 **공식 빠른 시작:** [Local_Operations_Quickstart.md](./Local_Operations_Quickstart.md)
 
-> **v1.5.0 참고:** Alembic head는 `0019_buyer_source_row_key`입니다. USB 패키지 폴더 예: `ORION-v1.5.0/source`.
+> **v1.5.0 참고:** Alembic head는 `0019_buyer_source_row_key`입니다. USB 패키지 폴더 예: `ORION-v1.5.1/source`.
 
 ---
 
@@ -51,9 +51,9 @@ EOF
 ### 1.1 폴더 복사 (USB)
 
 ```bash
-cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.0/source" ~/ORION
+cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.1/source" ~/ORION
 mkdir -p ~/ORION/backend/backups
-cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.0/backups/"* ~/ORION/backend/backups/
+cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.1/backups/"* ~/ORION/backend/backups/
 ```
 
 **작업 디렉터리:** `~/ORION` (Makefile, `backend/`, `frontend/`가 **바로** 여기 있어야 함)
@@ -219,7 +219,7 @@ cd ~/ORION
 USB 백업만 다시 받을 때:
 
 ```bash
-cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.0/backups/"* ~/ORION/backend/backups/
+cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.1/backups/"* ~/ORION/backend/backups/
 ```
 
 ---
@@ -278,6 +278,9 @@ EOF
 ## 5. 대시보드 · UI
 
 ### 5.1 상황 — Mission Control · Opportunity Finder 동시 `Load failed`
+
+> **Option B로 업로드까지 끝난 Mac**에서 코드만 v1.5.1로 올리려면:  
+> **[Other_Mac_InPlace_Upgrade_Guide.md](./Other_Mac_InPlace_Upgrade_Guide.md)** (DB 유지, `make restore` 금지)
 
 다른 Mac으로 옮긴 뒤 **로그인은 되는데** 아래 두 화면에서 Load failed / Simulation failed가 **함께** 나오는 경우가 많습니다.
 

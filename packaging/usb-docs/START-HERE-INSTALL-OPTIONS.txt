@@ -4,9 +4,9 @@ NUMBERED INSTALL RUNBOOK (v1.5.0) · 2026-07-28
 
 Full step-by-step (Terminal + Troubleshooting):
   docs/Other_Mac_Install_Runbook.md
-  (also copied under ORION-v1.5.0/docs/ on this USB)
+  (also copied under ORION-v1.5.1/docs/ on this USB)
 
-Replace package name if needed: ORION-v1.5.0
+Replace package name if needed: ORION-v1.5.1
 
 Choose ONE option, then follow the numbered sections in the Runbook:
   0 → 1 → 2 → 3 → (4A or 4B) → 5 → 6 → (7A or 7B) → 8
@@ -15,7 +15,7 @@ Choose ONE option, then follow the numbered sections in the Runbook:
 OPTION A — Full Migration (DB) — quick paste
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+  PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
   cp -R "$PKG/source" ~/ORION
   mkdir -p ~/ORION/backend/backups
   cp -R "$PKG/backups/"* ~/ORION/backend/backups/
@@ -37,7 +37,7 @@ OPTION A — Full Migration (DB) — quick paste
 OPTION B — System First (upload on this Mac) — quick paste
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  PKG="/Volumes/LeFrame_Dev/ORION-v1.5.0"
+  PKG="/Volumes/LeFrame_Dev/ORION-v1.5.1"
   cp -R "$PKG/source" ~/ORION
   cd ~/ORION
   /opt/homebrew/bin/python3.12 -m venv backend/.venv
@@ -47,15 +47,31 @@ OPTION B — System First (upload on this Mac) — quick paste
   # Then browser: /import  then  /buyer-import
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ALREADY INSTALLED + DATA UPLOADED + Load failed / upgrade to v1.5.1
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Do NOT run make restore (wipes uploaded data).
+  Full guide: docs/Other_Mac_InPlace_Upgrade_Guide.md
+
+  cd ~/ORION && bash scripts/dev.sh stop
+  make backup
+  # Git: git fetch && git checkout v1.5.1
+  # USB: rsync source from ORION-v1.5.1 (exclude .env, .venv, uploads, backups)
+  make setup-local && make migrate
+  bash scripts/dev.sh start --with-worker
+  # Mission Control: wait 2-5 min on first load, then refresh
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 CRITICAL RULES
-  - Copy ONLY .../source → ~/ORION  (not the whole ORION-v1.5.0 folder)
+  - Copy ONLY .../source → ~/ORION  (not the whole ORION-v1.5.1 folder)
   - Option A: restore BEFORE migrate
   - Do NOT git reset --hard on USB-copied trees
   - First /login may take 1-3 min; if HTTP 500 → bash scripts/dev.sh restart
 
 VERIFY:     OTHER-MAC-VERIFY.txt
 RUNBOOK:    docs/Other_Mac_Install_Runbook.md
+UPGRADE:    docs/Other_Mac_InPlace_Upgrade_Guide.md  (data kept, v1.5.1)
 OPS GUIDE:  docs/Other_Mac_Operations_Guide.md
 TROUBLE:    docs/Other_Mac_Native_Troubleshooting.md
 

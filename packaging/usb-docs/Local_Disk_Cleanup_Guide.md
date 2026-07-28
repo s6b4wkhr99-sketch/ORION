@@ -85,7 +85,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3002/login  # 200 기�
 
 ## 5. USB
 
-- **유지:** `LeFrame_Dev/ORION-v1.5.0` only (~7.8 GB)
+- **유지:** `LeFrame_Dev/ORION-v1.5.1` only (~7.8 GB)
 - **삭제됨 (2026-07-28):** ORION-v1.3.0, ORION-v1.3.1
 - Prospect 1년간 추가 없음 가정 → USB 재패키징 불필요 (Buyer만 주기 업로드)
 
