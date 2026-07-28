@@ -51,6 +51,8 @@ type StateDatum = {
   orders?: number;
   customers?: number;
   conversion?: number;
+  /** Purchases per unique buyer (Brand Loyalty) — purchases map only */
+  brandLoyalty?: number;
 };
 
 type UsChoroplethMapProps = {
@@ -289,6 +291,13 @@ export function UsChoroplethMap({
                   <p className="mt-1 text-[var(--cios-secondary)]">
                     Unique buyers:{" "}
                     <span className="font-medium text-gray-700">{displayState.customers.toLocaleString()}</span>
+                  </p>
+                )}
+                {displayState.brandLoyalty != null && (
+                  <p className="mt-1 text-[var(--cios-secondary)]">
+                    Brand Loyalty:{" "}
+                    <span className="font-medium text-gray-700">{displayState.brandLoyalty.toFixed(2)}×</span>
+                    <span className="ml-1 text-[10px] italic">purchases per buyer</span>
                   </p>
                 )}
               </>

@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USB_MOUNT="${USB_MOUNT:-/Volumes/LeFrame_Dev}"
-VERSION="${USB_VERSION:-1.4.0}"
+VERSION="${USB_VERSION:-1.5.0}"
 USB_ROOT="${USB_ROOT:-$USB_MOUNT/ORION-v$VERSION}"
 PREV_USB="${PREV_USB:-$USB_MOUNT/ORION-v1.3.0}"
 

@@ -2,6 +2,25 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.5.0] — 2026-07-28
+
+### Summary
+
+Purchase loyalty metrics, repeat-buyer-safe upload dedup, and Mission Control copy updates.
+
+### Features
+
+- **Brand Loyalty** on Purchases by State map hover — purchases per unique buyer by state
+- **Product Trust** Purchase Radar X-axis tab — repeat purchase intensity by state × SKU
+- Buyer upload **source_row_key** dedup — preserves multi-unit / repeat buyers; skips exact re-upload rows only
+- Alembic `0019_buyer_source_row_key` migration
+
+### Changed
+
+- Mission Control purchase widget subtitles (`Actual device purchases…`)
+- Buyer Upload result shows `rows_inserted` and `skipped_duplicates`
+- Order ref + paid-at fields parsed for stable purchase row keys
+
 ## [1.4.0] — 2026-07-28
 
 ### Summary

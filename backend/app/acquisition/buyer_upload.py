@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import uuid
 from collections import Counter
-from datetime import datetime
 
 import pandas as pd
 from sqlalchemy import func
@@ -39,6 +39,7 @@ _LOCATION_HEADERS = ("location", "shipping province", "billing province", "shipp
 _ADDRESS_HEADERS = ("address", "shipping address", "billing address")
 _STATUS_HEADERS = ("status", "financial status")
 _PAID_HEADERS = ("paid at", "paid at date")
+_ORDER_HEADERS = ("ordre number", "order number", "order id", "order name", "name", "#")
 
 
 def _header_map(columns: list[str]) -> dict[str, str]:
@@ -121,6 +122,7 @@ def _iter_buyer_rows(df: pd.DataFrame) -> list[dict]:
     addr_col = _pick_column(cols, _ADDRESS_HEADERS)
     status_col = _pick_column(cols, _STATUS_HEADERS)
     paid_col = _pick_column(cols, _PAID_HEADERS)
+    order_col = _pick_column(cols, _ORDER_HEADERS)
 
     if not email_col or not product_col:
         raise UploadValidationError(
@@ -153,6 +155,7 @@ def _iter_buyer_rows(df: pd.DataFrame) -> list[dict]:
         else:
             state = parse_us_state(loc_raw, source=source_channel)
         paid_at = _safe_str(row.get(paid_col)) if paid_col else None
+        order_ref = _safe_str(row.get(order_col)) if order_col else None
         era = "post2025" if paid_at and (paid_at.startswith("2025") or paid_at.startswith("2026")) else "pre2025"
 
         rows.append(
@@ -163,6 +166,8 @@ def _iter_buyer_rows(df: pd.DataFrame) -> list[dict]:
                 "sku_token": token,
                 "state": state,
                 "source_channel": source_channel,
+                "paid_at": paid_at,
+                "order_ref": order_ref,
                 "era": era,
             }
         )
@@ -213,6 +218,49 @@ def _match_customers(db: Session, emails: list[str]) -> dict[str, uuid.UUID]:
     return {normalize_email_key(r.email): r.customer_id for r in rows if r.email}
 
 
+def build_source_row_key(row: dict) -> str:
+    """Stable per-purchase key — repeat buyers keep separate rows when order/row differs."""
+    parts = [
+        normalize_email_key(row.get("email")) or "",
+        (row.get("sku_token") or "").upper(),
+        (row.get("product_raw") or "").strip(),
+        (row.get("state") or "OTHER").upper(),
+        (row.get("order_ref") or "").strip(),
+        (row.get("paid_at") or "").strip(),
+        str(row.get("row_number") or ""),
+        (row.get("source_channel") or "").strip(),
+    ]
+    payload = "\x1f".join(parts)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _load_existing_source_row_keys(db: Session, keys: set[str]) -> set[str]:
+    if not keys:
+        return set()
+    rows = db.query(BuyerPurchase.source_row_key).filter(BuyerPurchase.source_row_key.in_(keys)).all()
+    return {row[0] for row in rows if row[0]}
+
+
+def _partition_new_purchases(db: Session, parsed: list[dict]) -> tuple[list[dict], int]:
+    """Skip only exact same source purchase rows (re-upload), not repeat buyers."""
+    candidate_keys = {build_source_row_key(row) for row in parsed}
+    existing = _load_existing_source_row_keys(db, candidate_keys)
+    new_rows: list[dict] = []
+    seen_in_batch: set[str] = set()
+    skipped = 0
+
+    for row in parsed:
+        key = build_source_row_key(row)
+        row["source_row_key"] = key
+        if key in existing or key in seen_in_batch:
+            skipped += 1
+            continue
+        seen_in_batch.add(key)
+        new_rows.append(row)
+
+    return new_rows, skipped
+
+
 def process_buyer_upload(
     db: Session,
     file_path: str,
@@ -225,6 +273,13 @@ def process_buyer_upload(
     parsed = _iter_buyer_rows(df)
     if not parsed:
         raise UploadValidationError("No valid buyer chair rows found in file.")
+
+    new_rows, skipped_duplicates = _partition_new_purchases(db, parsed)
+    if not new_rows:
+        raise UploadValidationError(
+            f"All {len(parsed)} purchase rows already exist — no new records added.",
+            details={"skipped_duplicates": skipped_duplicates, "parsed_rows": len(parsed)},
+        )
 
     upload = RawUpload(
         upload_id=uuid.uuid4(),
@@ -240,10 +295,10 @@ def process_buyer_upload(
     db.add(upload)
     db.flush()
 
-    emails = sorted({r["email"] for r in parsed})
+    emails = sorted({r["email"] for r in new_rows})
     email_to_customer = _match_customers(db, emails)
 
-    for row in parsed:
+    for row in new_rows:
         key = normalize_email_key(row["email"])
         db.add(
             BuyerPurchase(
@@ -254,6 +309,7 @@ def process_buyer_upload(
                 sku_token=row["sku_token"],
                 state=row["state"],
                 source_channel=row["source_channel"],
+                source_row_key=row["source_row_key"],
                 matched_customer_id=email_to_customer.get(key),
             )
         )
@@ -261,22 +317,25 @@ def process_buyer_upload(
     db.commit()
     gap_report = run_upload_gap_analysis(db, upload.upload_id)
 
-    matched_rows = sum(1 for r in parsed if normalize_email_key(r["email"]) in email_to_customer)
-    matched_emails = len({r["email"] for r in parsed if normalize_email_key(r["email"]) in email_to_customer})
+    matched_rows = sum(1 for r in new_rows if normalize_email_key(r["email"]) in email_to_customer)
+    matched_emails = len({r["email"] for r in new_rows if normalize_email_key(r["email"]) in email_to_customer})
 
     summary = {
         "dataset_type": "buyer",
         "total_rows": len(df),
-        "chair_rows": len(parsed),
+        "chair_rows": len(new_rows),
+        "parsed_rows": len(parsed),
+        "rows_inserted": len(new_rows),
+        "skipped_duplicates": skipped_duplicates,
         "unique_emails": len(emails),
         "matched_emails": matched_emails,
         "matched_rows": matched_rows,
         "match_rate_pct": round(100 * matched_emails / max(len(emails), 1), 2),
-        "sku_distribution": dict(Counter(r["sku_token"] for r in parsed).most_common()),
-        "state_parsed_other": sum(1 for r in parsed if r["state"] == "OTHER"),
+        "sku_distribution": dict(Counter(r["sku_token"] for r in new_rows).most_common()),
+        "state_parsed_other": sum(1 for r in new_rows if r["state"] == "OTHER"),
         "gap_report": gap_report,
         "completed_at": now_app_iso(),
-        "rows_processed": len(parsed),
+        "rows_processed": len(new_rows),
     }
     upload.status = "completed"
     upload.summary_json = json.dumps(summary)

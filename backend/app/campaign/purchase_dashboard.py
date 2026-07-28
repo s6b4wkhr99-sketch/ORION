@@ -38,6 +38,11 @@ M_TOKENS = frozenset({"M2", "M4", "M6", "M6S", "M10"})
 RADAR_TOP_STATES_PER_SKU = 15
 
 
+def _loyalty_index(purchase_count: int, unique_buyers: int) -> float:
+    """Purchases per unique buyer — values above 1.0 indicate repeat / multi-unit buyers."""
+    return round(purchase_count / max(unique_buyers, 1), 2)
+
+
 def _percentile_map(values: dict[str, float]) -> dict[str, float]:
     if not values:
         return {}
@@ -129,16 +134,23 @@ def get_purchase_dashboard(db: Session) -> dict:
     map_states = {s: d for s, d in by_state.items() if s in US_STATES and s != "OTHER"}
     state_totals = {s: d["purchase_count"] for s, d in map_states.items()}
     state_volume_scores = _percentile_map({s: float(v) for s, v in state_totals.items()})
+    state_loyalty_indices = {
+        s: _loyalty_index(d["purchase_count"], len(d["unique_emails"])) for s, d in map_states.items()
+    }
+    brand_loyalty_scores = _percentile_map({s: float(v) for s, v in state_loyalty_indices.items()})
 
     purchases_by_state: list[dict] = []
     for state, bucket in sorted(map_states.items(), key=lambda x: -x[1]["purchase_count"]):
         count = bucket["purchase_count"]
+        uniq = len(bucket["unique_emails"])
         top_sku = max(bucket["sku_counts"].items(), key=lambda x: x[1])[0] if bucket["sku_counts"] else None
         purchases_by_state.append(
             {
                 "state": state,
                 "purchase_count": count,
-                "unique_buyers": len(bucket["unique_emails"]),
+                "unique_buyers": uniq,
+                "brand_loyalty_index": state_loyalty_indices.get(state, 1.0),
+                "brand_loyalty_score": brand_loyalty_scores.get(state, 50.0),
                 "purchase_share_pct": round(100 * count / total_rows, 2),
                 "top_sku_token": top_sku,
                 "shopify_count": bucket["shopify"],
@@ -174,6 +186,11 @@ def get_purchase_dashboard(db: Session) -> dict:
 
     cell_counts = {f"{s}|{t}": float(c["purchase_count"]) for (s, t), c in cells.items()}
     volume_scores = _percentile_map(cell_counts)
+    trust_indices = {
+        f"{state}|{sku}": _loyalty_index(cell["purchase_count"], len(cell_emails[(state, sku)]))
+        for (state, sku), cell in cells.items()
+    }
+    product_trust_scores = _percentile_map({k: float(v) for k, v in trust_indices.items()})
 
     state_axis: dict[str, dict] = {}
     for state, bucket in map_states.items():
@@ -204,6 +221,8 @@ def get_purchase_dashboard(db: Session) -> dict:
                 "purchase_volume_score": volume_scores.get(cell_id, 50.0),
                 "state_volume_score": axis.get("state_volume_score", 50.0),
                 "buyer_density_score": min(100.0, axis.get("buyer_density_score", 0)),
+                "product_trust_index": trust_indices.get(cell_id, 1.0),
+                "product_trust_score": product_trust_scores.get(cell_id, 50.0),
                 "national_share_pct": round(100 * count / total_rows, 2),
                 "revenue": float(count),
                 "customers": uniq,

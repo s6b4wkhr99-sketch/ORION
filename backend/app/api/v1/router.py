@@ -522,6 +522,8 @@ async def buyers_upload(
             "matched_emails": summary.get("matched_emails", 0),
             "unique_emails": summary.get("unique_emails", 0),
             "match_rate_pct": summary.get("match_rate_pct", 0),
+            "skipped_duplicates": summary.get("skipped_duplicates", 0),
+            "rows_inserted": summary.get("rows_inserted", summary.get("chair_rows", 0)),
             "gap_report": summary.get("gap_report"),
         }
     )

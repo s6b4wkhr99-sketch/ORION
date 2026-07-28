@@ -745,6 +745,8 @@ export type BuyerUploadResult = {
   matched_emails: number;
   unique_emails: number;
   match_rate_pct: number;
+  skipped_duplicates?: number;
+  rows_inserted?: number;
   summary: Record<string, unknown>;
   gap_report?: BuyerGapReport;
 };
@@ -939,6 +941,8 @@ export type PurchaseStateRow = {
   state: string;
   purchase_count: number;
   unique_buyers: number;
+  brand_loyalty_index: number;
+  brand_loyalty_score: number;
   purchase_share_pct: number;
   top_sku_token: string | null;
   shopify_count: number;
@@ -956,6 +960,8 @@ export type PurchaseRadarRow = {
   purchase_volume_score: number;
   state_volume_score: number;
   buyer_density_score: number;
+  product_trust_index: number;
+  product_trust_score: number;
   national_share_pct: number;
 };
 

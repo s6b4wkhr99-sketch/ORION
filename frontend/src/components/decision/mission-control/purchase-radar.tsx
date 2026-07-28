@@ -30,14 +30,17 @@ export type PurchaseRadarPoint = {
   purchase_volume_score: number;
   state_volume_score: number;
   buyer_density_score: number;
+  product_trust_index: number;
+  product_trust_score: number;
   national_share_pct: number;
 };
 
-type PurchaseXAxis = "state_volume" | "buyer_density";
+type PurchaseXAxis = "state_volume" | "buyer_density" | "product_trust";
 
-const X_DIMENSIONS: { id: PurchaseXAxis; label: string; key: keyof PurchaseRadarPoint }[] = [
-  { id: "state_volume", label: "State Purchase Index", key: "state_volume_score" },
-  { id: "buyer_density", label: "Buyer Density", key: "buyer_density_score" },
+const X_DIMENSIONS: { id: PurchaseXAxis; label: string; scoreKey: keyof PurchaseRadarPoint; rawKey: keyof PurchaseRadarPoint }[] = [
+  { id: "state_volume", label: "State Purchase Index", scoreKey: "state_volume_score", rawKey: "state_volume_score" },
+  { id: "buyer_density", label: "Buyer Density", scoreKey: "buyer_density_score", rawKey: "buyer_density_score" },
+  { id: "product_trust", label: "Product Trust", scoreKey: "product_trust_score", rawKey: "product_trust_index" },
 ];
 
 const MIN_BUBBLE_R = RADAR_MIN_BUBBLE_R;
@@ -54,8 +57,13 @@ function bubbleRadius(value: number, min: number, max: number): number {
 }
 
 function rawXValue(point: PurchaseRadarPoint, axis: PurchaseXAxis): number {
-  const key = X_DIMENSIONS.find((d) => d.id === axis)?.key ?? "state_volume_score";
-  return Number(point[key] ?? 0);
+  const dim = X_DIMENSIONS.find((d) => d.id === axis) ?? X_DIMENSIONS[0];
+  return Number(point[dim.rawKey] ?? 0);
+}
+
+function xScoreValue(point: PurchaseRadarPoint, axis: PurchaseXAxis): number {
+  const dim = X_DIMENSIONS.find((d) => d.id === axis) ?? X_DIMENSIONS[0];
+  return Number(point[dim.scoreKey] ?? 0);
 }
 
 function filterBySku<T extends { sku_token: string; purchase_count: number; state?: string }>(
@@ -192,7 +200,7 @@ export function PurchaseRadar({
       return {
         ...p,
         xRaw,
-        xScore: xRaw,
+        xScore: xScoreValue(p, xAxis),
         yScore: ySpreadMap.get(p.id) ?? p.purchase_volume_score,
       };
     });
@@ -362,11 +370,19 @@ export function PurchaseRadar({
               Unique buyers: {formatNumber(displayPoint.unique_buyers)} · National share:{" "}
               {displayPoint.national_share_pct}%
             </p>
+            <p className="text-gray-700">
+              Product Trust:{" "}
+              <span className="font-medium text-gray-700">{displayPoint.product_trust_index.toFixed(2)}×</span>
+              <span className="ml-1 text-[10px] italic text-[var(--cios-secondary)]">purchases per buyer</span>
+            </p>
             <p className="mt-2 border-t border-[var(--cios-border)] pt-2 text-gray-700">
               {Y_LABEL}: {Math.round(displayPoint.purchase_volume_score)}
             </p>
             <p className="text-gray-700">
-              {xLabel}: {Math.round(displayPoint.xRaw)}
+              {xLabel}:{" "}
+              {xAxis === "product_trust"
+                ? `${displayPoint.xRaw.toFixed(2)}×`
+                : Math.round(displayPoint.xRaw)}
             </p>
           </div>
         ) : null}

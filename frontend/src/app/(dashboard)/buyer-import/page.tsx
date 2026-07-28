@@ -177,8 +177,19 @@ export default function BuyerImportPage() {
         <section className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
           <h3 className="font-medium text-emerald-900">Upload complete</h3>
           <p className="mt-1 text-sm text-emerald-800">
-            {result.file_name} — {result.summary?.chair_rows as number} chair rows ·{" "}
-            <strong>{result.matched_emails}</strong> / {result.unique_emails} emails matched to ORION (
+            {result.file_name} — {result.summary?.rows_inserted ?? result.summary?.chair_rows ?? 0} new purchase
+            rows added
+            {(result.skipped_duplicates ?? (result.summary?.skipped_duplicates as number | undefined) ?? 0) > 0 ? (
+              <>
+                {" "}
+                ·{" "}
+                <strong>
+                  {result.skipped_duplicates ?? (result.summary?.skipped_duplicates as number)}
+                </strong>{" "}
+                duplicates skipped
+              </>
+            ) : null}{" "}
+            · <strong>{result.matched_emails}</strong> / {result.unique_emails} emails matched to ORION (
             {result.match_rate_pct}%)
           </p>
           {result.matched_emails > 0 && (

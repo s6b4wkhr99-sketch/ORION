@@ -285,6 +285,7 @@ export default function MissionControlPage() {
         revenue: 0,
         orders: row.purchase_count,
         customers: row.unique_buyers,
+        brandLoyalty: row.brand_loyalty_index,
       })),
     [purchaseData],
   );
@@ -524,8 +525,8 @@ export default function MissionControlPage() {
             title="Purchases by State"
             subtitle={
               purchaseData?.meta.other_count
-                ? `Actual chair purchases by geography · OTHER: ${formatNumber(purchaseData.meta.other_count)} (${purchaseData.meta.other_pct}%)`
-                : "Actual chair purchases by geography (not expected revenue)"
+                ? `Actual device purchases by geography · OTHER: ${formatNumber(purchaseData.meta.other_count)} (${purchaseData.meta.other_pct}%)`
+                : "Actual device purchases by geography"
             }
           >
             <UsChoroplethMap data={purchaseStateMap} variant="purchases" mapHeight={551} centered />
@@ -535,7 +536,7 @@ export default function MissionControlPage() {
           <WidgetShell
             fill
             title="Purchase Radar"
-            subtitle="Y: purchase volume score · X: switch axis (actual purchases)"
+            subtitle="Y: purchase volume score · X: switch axis"
           >
             <PurchaseRadar points={purchaseData?.purchase_radar ?? []} fill chartHeight={380} />
           </WidgetShell>

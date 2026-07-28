@@ -20,6 +20,7 @@ class BuyerPurchase(Base):
     sku_token: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     state: Mapped[str | None] = mapped_column(String(8), nullable=True)
     source_channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    source_row_key: Mapped[str | None] = mapped_column(String(64), nullable=True, unique=True, index=True)
     matched_customer_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("customers.customer_id"), nullable=True, index=True
     )
