@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { UsChoroplethMap } from "@/components/dashboard/us-choropleth-map";
 import { RevenueByCityBubbleChart } from "@/components/market-intelligence/revenue-by-city-bubble-chart";
+import { SellableProductsSection } from "@/components/market-intelligence/sellable-products-section";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { SegmentDonutPanel } from "@/components/ui/segment-donut-panel";
 import { MockupKpiCard } from "@/components/mockup/mockup-kpi-card";
@@ -98,6 +99,11 @@ export function StateView({ stateParam }: StateViewProps) {
   const hasSegmentData = Object.values(data.segment_distribution ?? {}).some(
     (dist) => dist && Object.keys(dist).length > 0,
   );
+  const sellableProducts = data.selected_state
+    ? mergeSellableProducts(
+        data.sellable_products?.length ? data.sellable_products : (data.product_opportunity ?? []),
+      )
+    : [];
 
   return (
     <div className="space-y-6">
@@ -112,7 +118,7 @@ export function StateView({ stateParam }: StateViewProps) {
               <h2 className="text-base font-semibold text-gray-900">Opportunity by State</h2>
               <p className="mt-1 text-xs text-[var(--cios-secondary)]">
                 {data.selected_state
-                  ? `${data.selected_state} selected — segment mix and city revenue below. Click another state to switch.`
+                  ? `${data.selected_state} selected — sellable products, segment mix, and city revenue below. Click another state to switch.`
                   : "Showing United States totals. Click a state on the map to drill down."}
               </p>
             </div>
@@ -166,7 +172,7 @@ export function StateView({ stateParam }: StateViewProps) {
               chartHeight={STATE_CITY_PLOT_HEIGHT}
               data={data.revenue_by_city}
               dataByProduct={data.revenue_by_city_by_product}
-              productTargets={mergeSellableProducts(data.product_opportunity ?? [])}
+              productTargets={sellableProducts}
             />
           </section>
         )}
@@ -200,6 +206,14 @@ export function StateView({ stateParam }: StateViewProps) {
           />
         </div>
       </section>
+
+      {data.selected_state && sellableProducts.length > 0 && (
+        <SellableProductsSection
+          products={sellableProducts}
+          title={`${scopeLabel} — Sellable Products`}
+          subtitle="Recommended SKUs for the selected state, ranked by expected customers and revenue."
+        />
+      )}
 
       {hasSegmentData && (
         <section>

@@ -5,6 +5,7 @@ import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
 import { SegmentDonutPanel } from "@/components/ui/segment-donut-panel";
 import { MockupKpiCard } from "@/components/mockup/mockup-kpi-card";
 import { ExpectedRevenueInfo } from "@/components/ui/info-tooltip";
+import { SellableProductsSection } from "@/components/market-intelligence/sellable-products-section";
 
 type MarketDetailPanelsProps = {
   title: string;
@@ -114,19 +115,7 @@ export function MarketDetailPanels({
       )}
 
       {sellableProducts && sellableProducts.length > 0 && (
-        <section>
-          <h3 className="mb-3 text-base font-semibold text-gray-900">Sellable Products</h3>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {sellableProducts.slice(0, 8).map((p) => (
-              <div key={p.product} className="cios-card p-4">
-                <p className="font-semibold text-gray-900">{p.product}</p>
-                <p className="mt-2 text-sm text-[var(--cios-secondary)]">
-                  {formatNumber(p.expected_customers)} customers · {formatCurrency(p.expected_revenue)}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
+        <SellableProductsSection products={sellableProducts} />
       )}
     </div>
   );
