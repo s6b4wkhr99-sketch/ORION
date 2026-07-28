@@ -1,0 +1,42 @@
+ORION v1.5.0 — Other Mac install verify (after Option 1 or 2)
+==============================================================
+
+Run on the OTHER Mac after: make setup-local && postgres-up && (restore+) migrate && dev.sh start
+
+1) Project layout
+   cd ~/ORION && ls Makefile backend frontend
+   # All three must exist directly under ~/ORION
+
+2) PostgreSQL
+   pg_isready -h 127.0.0.1 -p 5432
+
+3) Backend
+   curl -s http://127.0.0.1:8000/api/v1/health | head -c 80
+   # Expect: "success":true
+
+4) Frontend (wait 1-3 min on first start while .next builds)
+   curl -s -o /dev/null -w "login HTTP %{http_code}\n" http://127.0.0.1:3002/login
+   # Expect: login HTTP 200
+   # If 500: bash scripts/dev.sh restart
+
+5) Option 1 only — DB counts
+   cd ~/ORION/backend && source .venv/bin/activate
+   python -c "
+from app.database import SessionLocal
+from sqlalchemy import text
+db = SessionLocal()
+print('customers:', f\"{db.execute(text('SELECT COUNT(*) FROM customers')).scalar():,}\")
+print('buyer_purchases:', db.execute(text('SELECT COUNT(*) FROM buyer_purchases')).scalar())
+db.close()
+"
+   # Expect: customers ~2,611,472 · buyer_purchases ~5,289
+
+6) Backup on disk (Option 1)
+   ls ~/ORION/backend/backups/*/database.sql.gz
+   # make restore reads .gz automatically
+
+7) Login in browser
+   http://127.0.0.1:3002/login
+   user@company.com / Ceragem2026!Adm
+
+TROUBLESHOOTING: docs/Other_Mac_Native_Troubleshooting.md

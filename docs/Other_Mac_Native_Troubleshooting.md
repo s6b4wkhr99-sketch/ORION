@@ -361,6 +361,27 @@ open http://127.0.0.1:3002/mission-control
 
 ---
 
+### 5.4 Internal Server Error — `/login` 500 (`.next` 삭제 후)
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | 브라우저 **Internal Server Error**; `/login` HTTP **500** |
+| **로그** | `frontend.log`: `ENOENT ... frontend/.next/dev/server/app/login/page.js` |
+| **원인** | 디스크 정리 등으로 **`frontend/.next` 삭제** 후 프론트엔드 **미재기동** |
+| **Backend** | `curl http://127.0.0.1:8000/api/v1/health` → **200** (DB·API 정상) |
+
+**해결:**
+
+```bash
+cd ~/ORION   # 또는 CIOS 프로젝트 루트
+bash scripts/dev.sh restart
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:3002/login   # 200 기대
+```
+
+상세·정기 디스크 정리: [Local_Disk_Cleanup_Guide.md](./Local_Disk_Cleanup_Guide.md)
+
+---
+
 ### 5.3 Market Intelligence — 지도가 거의 회색
 
 | 항목 | 내용 |

@@ -148,7 +148,11 @@ cmd_restart() {
   for arg in "$@"; do args+=("$arg"); done
   cmd_stop
   echo ""
-  exec bash "$ROOT/scripts/dev.sh" start "${args[@]}"
+  if [ ${#args[@]} -gt 0 ]; then
+    exec bash "$ROOT/scripts/dev.sh" start "${args[@]}"
+  else
+    exec bash "$ROOT/scripts/dev.sh" start
+  fi
 }
 
 ACTION="${1:-}"

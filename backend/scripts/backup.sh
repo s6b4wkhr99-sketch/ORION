@@ -31,6 +31,8 @@ if [ -n "${DATABASE_URL:-}" ]; then
       exit 1
     fi
     echo "  database.sql ($(du -h "$DEST/database.sql" | awk '{print $1}'))"
+    gzip -9 "$DEST/database.sql"
+    echo "  database.sql.gz ($(du -h "$DEST/database.sql.gz" | awk '{print $1}'))"
   elif is_sqlite_url "$DATABASE_URL"; then
     DB_FILE="$(resolve_sqlite_path "$DATABASE_URL" "$ROOT")"
     if [ -f "$DB_FILE" ]; then
@@ -43,7 +45,9 @@ if [ -n "${DATABASE_URL:-}" ]; then
 fi
 
 UPLOAD_DIR="${UPLOAD_DIR:-uploads}"
-if [ -d "$ROOT/$UPLOAD_DIR" ]; then
+# Skip uploads.tar.gz on dev Mac when backend/uploads/ already exists (saves ~1–3 GB).
+# Set BACKUP_INCLUDE_UPLOADS=true for off-machine restore bundles.
+if [ "${BACKUP_INCLUDE_UPLOADS:-false}" = "true" ] && [ -d "$ROOT/$UPLOAD_DIR" ]; then
   tar -czf "$DEST/uploads.tar.gz" -C "$ROOT" "$UPLOAD_DIR"
   echo "  uploads.tar.gz ($(du -h "$DEST/uploads.tar.gz" | awk '{print $1}'))"
 fi

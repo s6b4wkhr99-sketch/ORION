@@ -5,6 +5,7 @@ from app.intelligence.buyer_gap_mapping import (
     V4_DEFAULT_COUNTERPART,
     V4_UPTIER_COUNTERPART,
     buyer_compare_sku,
+    parse_purchase_token,
     v4_prospect_counterpart,
 )
 
@@ -63,3 +64,23 @@ def test_direct_map_for_v6():
     sku, rule = buyer_compare_sku("Ceragem Master V6")
     assert sku == "Master V6"
     assert rule == "direct_map"
+
+
+def test_m6s_from_shopify_product_title():
+    product = "CERAGEM M6 - M6(s) - Only Massage Chair / Beige"
+    assert parse_purchase_token(product) == "M6S"
+    sku, rule = buyer_compare_sku(product)
+    assert sku == "Pause M6s"
+    assert rule == "direct_map"
+
+
+def test_m6_without_s_suffix_stays_m6():
+    product = "CERAGEM M6 - M6 - With Accessories / Brown"
+    assert parse_purchase_token(product) == "M6"
+    sku, rule = buyer_compare_sku(product)
+    assert sku == "Pause M6"
+    assert rule == "direct_map"
+
+
+def test_m6s_token_literal():
+    assert parse_purchase_token("Ceragem Pause M6S Chair") == "M6S"

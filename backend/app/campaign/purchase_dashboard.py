@@ -79,7 +79,6 @@ def get_purchase_dashboard(db: Session) -> dict:
                 "other_count": 0,
                 "other_pct": 0,
                 "buyer_upload_batches": 0,
-                "disclaimer": "No buyer purchase data uploaded yet.",
             },
         }
 
@@ -251,9 +250,5 @@ def get_purchase_dashboard(db: Session) -> dict:
             "other_count": other_count,
             "other_pct": round(100 * other_count / max(total_rows, 1), 1),
             "buyer_upload_batches": db.query(func.count(func.distinct(BuyerPurchase.upload_id))).scalar() or 0,
-            "disclaimer": (
-                "Actual purchases from Buyer Upload — not prospect forecasts. "
-                f"{round(100 * other_count / max(total_rows, 1), 1)}% of rows have unassigned state (OTHER)."
-            ),
         },
     }

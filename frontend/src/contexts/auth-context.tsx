@@ -8,6 +8,8 @@ import { AUTH_REQUIRED, DEV_FALLBACK_SESSION, hasModule, modulesForRole, type Pe
 type AuthContextValue = {
   session: AuthSession | null;
   loading: boolean;
+  /** True while /auth/me refreshes in the background after optimistic session hydrate. */
+  refreshing: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
   refreshSession: () => Promise<void>;
@@ -20,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [session, setSession] = useState<AuthSession | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const refreshSession = useCallback(async () => {
     if (!api.hasStoredToken()) {
@@ -51,11 +54,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    void (async () => {
-      setLoading(true);
-      await refreshSession();
+    let cancelled = false;
+
+    if (api.hasStoredToken()) {
+      const stored = api.readStoredSession();
+      if (stored) {
+        setSession(stored);
+        setLoading(false);
+      }
+    } else if (!AUTH_REQUIRED) {
+      setSession({
+        ...DEV_FALLBACK_SESSION,
+        modules: modulesForRole(DEV_FALLBACK_SESSION.role),
+      });
       setLoading(false);
+    }
+
+    void (async () => {
+      setRefreshing(true);
+      await refreshSession();
+      if (!cancelled) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshSession]);
 
   const login = useCallback(
@@ -85,8 +111,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ session, loading, login, logout, refreshSession, canAccess }),
-    [session, loading, login, logout, refreshSession, canAccess],
+    () => ({ session, loading, refreshing, login, logout, refreshSession, canAccess }),
+    [session, loading, refreshing, login, logout, refreshSession, canAccess],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

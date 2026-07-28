@@ -980,7 +980,6 @@ export type PurchaseDashboard = {
     other_count: number;
     other_pct: number;
     buyer_upload_batches: number;
-    disclaimer: string;
   };
 };
 
@@ -1084,7 +1083,13 @@ export type CommercialCatalogProduct = {
   ceragem_cogs?: number | null;
   order?: number;
   active?: boolean;
+  /** Catalog Gross after standing promo (MSRP − Promo). Same as post_promo_price. */
+  gross?: number;
   post_promo_price?: number;
+  /** Net Profit = Gross − LE Frame Incentive − COGS */
+  net_profit?: number | null;
+  /** Net Profit (%) = Net Profit / (Gross − LE Frame Incentive) */
+  net_profit_pct?: number | null;
 };
 
 export type CommercialCatalogSnapshot = {

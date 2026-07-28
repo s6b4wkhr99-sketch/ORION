@@ -52,6 +52,15 @@ def test_normalize_product_record_promo_pct_from_percent_input():
     )
     assert product["default_promotion_pct"] == 0.2
     assert enrich_catalog_product(product)["post_promo_price"] == 5119.2
+    assert enrich_catalog_product(product)["gross"] == 5119.2
+    # LE = Gross × 15%; Net Profit = Gross − LE − COGS; NP% = NP / (Gross − LE)
+    enriched = enrich_catalog_product(product)
+    assert enriched["le_frame_incentive"] == round(5119.2 * 0.15, 2)
+    assert enriched["net_profit"] == round(5119.2 - enriched["le_frame_incentive"] - 2980, 2)
+    assert enriched["net_profit_pct"] == round(
+        enriched["net_profit"] / (5119.2 - enriched["le_frame_incentive"]),
+        4,
+    )
 
 
 def test_save_and_publish_updates_runtime_catalog(db):

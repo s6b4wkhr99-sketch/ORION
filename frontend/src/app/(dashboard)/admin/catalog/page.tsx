@@ -12,6 +12,8 @@ import {
 import { Package, Plus, RefreshCw, Save } from "lucide-react";
 
 const FAMILIES = ["Master", "Pause", "MediSpa"] as const;
+/** LE Frame Incentive = Gross × 15% */
+const LE_FRAME_INCENTIVE_RATE = 0.15;
 
 type SkuDraft = CommercialCatalogProduct & { _key: string };
 
@@ -26,15 +28,52 @@ function formatPct(value: number | null | undefined) {
   return `${pct.toFixed(pct % 1 === 0 ? 0 : 1)}%`;
 }
 
-function computePostPromo(product: CommercialCatalogProduct) {
-  const gross = product.gross_sales || product.selling_price || 0;
+/** Gross = MSRP − Promo (standing promo applied). Final catalog price after promo. */
+function computeGross(product: CommercialCatalogProduct) {
+  const list = product.gross_sales || product.selling_price || product.msrp || 0;
   const pct = product.default_promotion_pct;
   const code = product.promo_code;
   if (code && pct && pct > 0) {
     const rate = pct > 1 ? pct / 100 : pct;
-    return Math.round(gross * (1 - rate) * 100) / 100;
+    return Math.round(list * (1 - rate) * 100) / 100;
   }
-  return gross;
+  return list;
+}
+
+/** Promo $ amount: MSRP − Gross */
+function computePromoAmount(product: CommercialCatalogProduct) {
+  const msrp = product.msrp || 0;
+  const gross = computeGross(product);
+  return Math.round(Math.max(0, msrp - gross) * 100) / 100;
+}
+
+/** LE Frame Incentive = Gross × 15% */
+function computeLeFrameIncentive(product: CommercialCatalogProduct) {
+  const gross = computeGross(product);
+  return Math.round(gross * LE_FRAME_INCENTIVE_RATE * 100) / 100;
+}
+
+/**
+ * Net Profit = MSRP − Promo − LE Frame Incentive − COGS
+ * (= Gross − LE Frame Incentive − COGS)
+ */
+function computeNetProfit(product: CommercialCatalogProduct) {
+  const gross = computeGross(product);
+  const le = computeLeFrameIncentive(product);
+  const cogs = product.ceragem_cogs;
+  if (cogs == null || Number.isNaN(cogs)) return null;
+  return Math.round((gross - le - cogs) * 100) / 100;
+}
+
+/** Net Profit (%) = Net Profit / (Gross − LE Frame Incentive) */
+function computeNetProfitPct(product: CommercialCatalogProduct) {
+  const net = computeNetProfit(product);
+  if (net == null) return null;
+  const gross = computeGross(product);
+  const le = computeLeFrameIncentive(product);
+  const base = gross - le;
+  if (base <= 0) return null;
+  return net / base;
 }
 
 function toDraft(product: CommercialCatalogProduct): SkuDraft {
@@ -63,16 +102,30 @@ function emptyDraft(order: number): SkuDraft {
 }
 
 function serializeProducts(products: SkuDraft[]): CommercialCatalogProduct[] {
-  return products.map(({ _key: _ignored, post_promo_price: _pp, default_promotion_pct_display: _disp, ...product }) => ({
-    ...product,
-    promo_code: product.promo_code?.trim() || null,
-    default_promotion_pct:
-      product.promo_code && product.default_promotion_pct
-        ? product.default_promotion_pct > 1
-          ? product.default_promotion_pct / 100
-          : product.default_promotion_pct
-        : null,
-  }));
+  return products.map(
+    ({
+      _key: _ignored,
+      post_promo_price: _pp,
+      default_promotion_pct_display: _disp,
+      gross: _gross,
+      net_profit: _np,
+      net_profit_pct: _npp,
+      ...product
+    }) => {
+      const normalized: CommercialCatalogProduct = {
+        ...product,
+        promo_code: product.promo_code?.trim() || null,
+        default_promotion_pct:
+          product.promo_code && product.default_promotion_pct
+            ? product.default_promotion_pct > 1
+              ? product.default_promotion_pct / 100
+              : product.default_promotion_pct
+            : null,
+      };
+      normalized.le_frame_incentive = computeLeFrameIncentive(normalized);
+      return normalized;
+    },
+  );
 }
 
 export default function SkuCatalogAdminPage() {
@@ -160,6 +213,7 @@ export default function SkuCatalogAdminPage() {
       return;
     }
     draft.code = draft.code.trim();
+    draft.le_frame_incentive = computeLeFrameIncentive(draft);
     draft._key = editor.mode === "add" ? draft.code : editor.product._key;
 
     if (editor.mode === "add" && products.some((row) => row.code === draft.code)) {
@@ -198,8 +252,9 @@ export default function SkuCatalogAdminPage() {
             <Package className="h-5 w-5" /> SKU Catalog & Pricing
           </h1>
           <p className="mt-1 text-sm text-[var(--cios-secondary)]">
-            Manage active SKUs, list prices, and standing promotions. Publishing updates the live commercial catalog used
-            by recommendations, forecasts, and Mission Control.
+            Manage active SKUs and standing promotions. Pricing waterfall:{" "}
+            <span className="font-medium text-gray-700">MSRP − Promo = Gross</span>. Publishing updates the live
+            commercial catalog used by recommendations, forecasts, and Mission Control.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -263,16 +318,36 @@ export default function SkuCatalogAdminPage() {
             { key: "family", header: "Family", getValue: (r) => r.family, filterable: true },
             { key: "segment", header: "Segment", getValue: (r) => r.segment ?? "—" },
             { key: "msrp", header: "MSRP", getValue: (r) => formatMoney(r.msrp), sortable: true },
-            { key: "gross", header: "Gross", getValue: (r) => formatMoney(r.gross_sales), sortable: true },
             {
               key: "promo",
               header: "Promo",
               getValue: (r) => (r.promo_code ? `${r.promo_code} ${formatPct(r.default_promotion_pct)}` : "—"),
             },
             {
-              key: "post",
-              header: "Post-Promo",
-              getValue: (r) => formatMoney(computePostPromo(r)),
+              key: "gross",
+              header: "Gross",
+              getValue: (r) => formatMoney(computeGross(r)),
+              sortable: true,
+            },
+            {
+              key: "net_profit",
+              header: "Net Profit",
+              getValue: (r) => computeNetProfit(r),
+              render: (r) => formatMoney(computeNetProfit(r)),
+              sortable: true,
+            },
+            {
+              key: "net_profit_pct",
+              header: "Net Profit (%)",
+              getValue: (r) => {
+                const pct = computeNetProfitPct(r);
+                return pct == null ? null : Math.round(pct * 1000) / 10;
+              },
+              render: (r) => {
+                const pct = computeNetProfitPct(r);
+                if (pct == null) return "—";
+                return `${(pct * 100).toFixed(1)}%`;
+              },
               sortable: true,
             },
             {
@@ -405,7 +480,7 @@ function SkuEditorModal({
               onChange={(e) => onChange({ ...product, msrp: Number(e.target.value) || 0 })}
             />
           </Field>
-          <Field label="Gross Sales">
+          <Field label="List Price (pre-promo)">
             <input
               type="number"
               className="cios-input w-full"
@@ -421,12 +496,14 @@ function SkuEditorModal({
               onChange={(e) => onChange({ ...product, max_promotion: Number(e.target.value) || 0 })}
             />
           </Field>
-          <Field label="LE Frame Incentive">
+          <Field label="LE Frame Incentive (Gross × 15%)">
             <input
               type="number"
-              className="cios-input w-full"
-              value={product.le_frame_incentive ?? ""}
-              onChange={(e) => onChange({ ...product, le_frame_incentive: Number(e.target.value) || 0 })}
+              className="cios-input w-full bg-gray-50"
+              value={computeLeFrameIncentive(product) || ""}
+              readOnly
+              disabled
+              title="Automatically calculated as 15% of Gross"
             />
           </Field>
           <Field label="Ceragem COGS">
@@ -485,8 +562,17 @@ function SkuEditorModal({
             </label>
           </Field>
         </div>
-        <p className="mt-4 text-sm text-[var(--cios-secondary)]">
-          Post-promo preview: {formatMoney(computePostPromo(product))}
+        <p className="mt-4 space-y-1 text-sm text-[var(--cios-secondary)]">
+          <span className="block">
+            Pricing: MSRP → Promo → Gross. Gross = {formatMoney(computeGross(product))}
+            {computePromoAmount(product) > 0 ? ` (Promo ${formatMoney(computePromoAmount(product))})` : ""}
+          </span>
+          <span className="block">
+            Net Profit = Gross − LE Frame (15%) − COGS → {formatMoney(computeNetProfit(product))}
+            {computeNetProfitPct(product) != null
+              ? ` (${(computeNetProfitPct(product)! * 100).toFixed(1)}%)`
+              : ""}
+          </span>
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" className="cios-btn border border-[var(--cios-border)] px-4 py-2" onClick={onClose}>

@@ -17,7 +17,7 @@ from app.commercial.catalog import (
     set_runtime_catalog,
 )
 from app.models.commercial import CommercialCatalogVersion
-from app.reference.registry import COMMERCIAL_VERSION, PRODUCT_CATALOG
+from app.reference.registry import COMMERCIAL_VERSION, LE_FRAME_COMMISSION_RATE, PRODUCT_CATALOG
 
 VALID_FAMILIES = frozenset({"Master", "Pause", "MediSpa"})
 
@@ -71,6 +71,7 @@ def _coerce_promo_pct(value: object) -> float | None:
 
 
 def _post_promo_price(product: dict) -> float:
+    """Gross after standing promo: list/gross_sales × (1 − promo%). Alias of catalog Gross."""
     gross = float(product.get("gross_sales") or product.get("selling_price") or 0)
     promo_code = product.get("promo_code")
     pct = product.get("default_promotion_pct")
@@ -105,7 +106,7 @@ def normalize_product_record(raw: dict, *, existing: dict | None = None) -> dict
     ceragem_cogs = raw.get("ceragem_cogs", seed.get("ceragem_cogs"))
     ceragem_cogs = float(ceragem_cogs) if ceragem_cogs not in (None, "") else None
 
-    return {
+    record = {
         "code": code,
         "name": str(raw.get("name") or seed.get("name") or code).strip(),
         "family": str(raw.get("family") or seed.get("family") or "Master").strip(),
@@ -116,12 +117,14 @@ def normalize_product_record(raw: dict, *, existing: dict | None = None) -> dict
         "gross_sales": gross_sales,
         "default_promotion_pct": default_pct,
         "promo_code": promo_code,
-        "le_frame_incentive": float(raw.get("le_frame_incentive", seed.get("le_frame_incentive", 0)) or 0),
         "ceragem_cogs": ceragem_cogs,
         "segment": str(raw.get("segment") or seed.get("segment") or "Wellness").strip(),
         "order": int(raw.get("order", seed.get("order", 50)) or 50),
         "active": active,
     }
+    # LE Frame Incentive is always Gross × 15% (standing post-promo Gross)
+    record["le_frame_incentive"] = round(_post_promo_price(record) * float(LE_FRAME_COMMISSION_RATE), 2)
+    return record
 
 
 def validate_catalog_products(products: list[dict]) -> tuple[list[dict], list[str]]:
@@ -168,7 +171,26 @@ def validate_catalog_products(products: list[dict]) -> tuple[list[dict], list[st
 
 def enrich_catalog_product(product: dict) -> dict:
     enriched = dict(product)
-    enriched["post_promo_price"] = _post_promo_price(product)
+    # Catalog Gross = MSRP − Promo (standing promo applied to list). Keep post_promo_price for API compat.
+    gross = _post_promo_price(product)
+    enriched["post_promo_price"] = gross
+    enriched["gross"] = gross
+
+    # LE Frame Incentive = Gross × 15%
+    le = round(gross * float(LE_FRAME_COMMISSION_RATE), 2)
+    enriched["le_frame_incentive"] = le
+    cogs_raw = product.get("ceragem_cogs")
+    if cogs_raw is not None and cogs_raw != "":
+        cogs = float(cogs_raw)
+        # Net Profit = MSRP − Promo − LE Frame Incentive − COGS (= Gross − LE − COGS)
+        net_profit = round(gross - le - cogs, 2)
+        enriched["net_profit"] = net_profit
+        margin_base = gross - le
+        enriched["net_profit_pct"] = round(net_profit / margin_base, 4) if margin_base > 0 else None
+    else:
+        enriched["net_profit"] = None
+        enriched["net_profit_pct"] = None
+
     pct = product.get("default_promotion_pct")
     enriched["default_promotion_pct_display"] = round(float(pct) * 100, 1) if pct else None
     return enriched
@@ -289,24 +311,24 @@ def parse_catalog_csv(content: str) -> tuple[list[dict], list[str]]:
         active_raw = raw.get("active", "true").lower()
         active = active_raw not in {"false", "0", "no", "inactive"}
 
-        catalog.append(
-            {
-                "code": code,
-                "name": (existing or {}).get("name", code),
-                "family": (existing or {}).get("family", "Master"),
-                "category": (existing or {}).get("category", "Core"),
-                "msrp": _float("msrp", (existing or {}).get("msrp", 0.0)) or 0.0,
-                "selling_price": _float("selling_price", (existing or {}).get("selling_price")),
-                "max_promotion": _float("max_promotion", (existing or {}).get("max_promotion", 0.0)) or 0.0,
-                "gross_sales": _float("gross_sales", _float("selling_price")),
-                "default_promotion_pct": default_pct,
-                "promo_code": raw.get("promo_code") or None,
-                "le_frame_incentive": _float("le_frame_incentive", (existing or {}).get("le_frame_incentive")),
-                "segment": (existing or {}).get("segment", "Wellness"),
-                "order": (existing or {}).get("order", 50),
-                "active": active,
-            }
-        )
+        row = {
+            "code": code,
+            "name": (existing or {}).get("name", code),
+            "family": (existing or {}).get("family", "Master"),
+            "category": (existing or {}).get("category", "Core"),
+            "msrp": _float("msrp", (existing or {}).get("msrp", 0.0)) or 0.0,
+            "selling_price": _float("selling_price", (existing or {}).get("selling_price")),
+            "max_promotion": _float("max_promotion", (existing or {}).get("max_promotion", 0.0)) or 0.0,
+            "gross_sales": _float("gross_sales", _float("selling_price")),
+            "default_promotion_pct": default_pct,
+            "promo_code": raw.get("promo_code") or None,
+            "segment": (existing or {}).get("segment", "Wellness"),
+            "order": (existing or {}).get("order", 50),
+            "active": active,
+            "ceragem_cogs": (existing or {}).get("ceragem_cogs"),
+        }
+        row["le_frame_incentive"] = round(_post_promo_price(row) * float(LE_FRAME_COMMISSION_RATE), 2)
+        catalog.append(row)
 
     if errors:
         return [], errors

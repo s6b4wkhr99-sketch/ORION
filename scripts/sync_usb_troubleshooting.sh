@@ -6,7 +6,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 USB_ROOT="${USB_ROOT:-/Volumes/LeFrame_Dev/ORION-v1.5.0}"
 DOCS="$USB_ROOT/docs"
 SRC="$ROOT/docs/Other_Mac_Native_Troubleshooting.md"
+OPS="$ROOT/docs/Other_Mac_Operations_Guide.md"
+DISK="$ROOT/docs/Local_Disk_Cleanup_Guide.md"
 QUICKSTART="$ROOT/docs/Local_Operations_Quickstart.md"
+INSTALL="$ROOT/packaging/usb-docs/START-HERE-INSTALL-OPTIONS.txt"
 
 if [ ! -d "/Volumes/LeFrame_Dev" ]; then
   echo "ERROR: USB 'LeFrame_Dev' not mounted."
@@ -17,11 +20,13 @@ fi
 
 mkdir -p "$DOCS"
 cp "$SRC" "$DOCS/Other_Mac_Native_Troubleshooting.md"
+cp "$OPS" "$DOCS/Other_Mac_Operations_Guide.md"
+cp "$DISK" "$DOCS/Local_Disk_Cleanup_Guide.md"
 cp "$QUICKSTART" "$DOCS/Local_Operations_Quickstart.md"
+cp "$INSTALL" "$USB_ROOT/START-HERE-INSTALL-OPTIONS.txt"
 
-# Cross-link standalone copy (Quickstart links stay valid inside ORION source; USB copy is reference)
-echo "✓ Copied to $DOCS/"
-ls -la "$DOCS/Other_Mac_Native_Troubleshooting.md" "$DOCS/Local_Operations_Quickstart.md"
+echo "✓ Copied to $DOCS/ and START-HERE-INSTALL-OPTIONS.txt"
+ls -la "$DOCS/Other_Mac_Operations_Guide.md" "$DOCS/Other_Mac_Native_Troubleshooting.md" "$USB_ROOT/START-HERE-INSTALL-OPTIONS.txt"
 
 if [ -f "$USB_ROOT/README-USB.md" ]; then
   if ! grep -q "Other_Mac_Native_Troubleshooting" "$USB_ROOT/README-USB.md"; then

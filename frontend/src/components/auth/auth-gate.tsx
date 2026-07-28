@@ -24,7 +24,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
   }, [loading, session, pathname, router, canAccess]);
 
-  if (loading) {
+  if (loading && !session) {
     return (
       <div className="min-h-screen bg-[var(--cios-background)] p-6">
         <PageSkeleton />

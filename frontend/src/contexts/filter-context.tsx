@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { api, type UploadSummary } from "@/lib/api";
 import { useAuth } from "@/contexts/auth-context";
 import { ensureDashboardCacheGeneration } from "@/lib/dashboard-cache";
@@ -43,9 +44,29 @@ const FilterContext = createContext<FilterContextValue | null>(null);
 
 const UPLOADS_BOOT_TIMEOUT_MS = 15_000;
 const FILTERS_READY_SAFETY_MS = 8_000;
+const UPLOAD_DEFER_IDLE_MS = 4_000;
+
+/** Routes that do not need upload scope on first paint — defer upload list fetch. */
+const UPLOAD_OPTIONAL_PREFIXES = [
+  "/admin",
+  "/buyer-import",
+  "/settings",
+  "/learning",
+  "/campaigns",
+  "/campaign-center",
+  "/export",
+];
+
+function pathNeedsUploadScope(pathname: string): boolean {
+  return !UPLOAD_OPTIONAL_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
+}
 
 export function FilterProvider({ children }: { children: React.ReactNode }) {
   const { canAccess } = useAuth();
+  const pathname = usePathname();
+  const needsUploadScope = pathNeedsUploadScope(pathname);
   const [uploads, setUploads] = useState<UploadSummary[]>([]);
   const [uploadsSignatureKey, setUploadsSignatureKey] = useState("");
   const [selectedUploadId, setSelectedUploadId] = useState<string | null>(null);
@@ -136,7 +157,28 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     ensureDashboardCacheGeneration();
-    void refreshUploads();
+
+    if (!canAccess("upload")) {
+      setFiltersReady(true);
+      return;
+    }
+
+    const loadUploads = () => {
+      void refreshUploads();
+    };
+
+    let deferTimer: number | undefined;
+    let idleId: number | undefined;
+
+    if (needsUploadScope || uploadsSignatureRef.current !== "") {
+      loadUploads();
+    } else {
+      deferTimer = window.setTimeout(loadUploads, UPLOAD_DEFER_IDLE_MS);
+      if (typeof requestIdleCallback !== "undefined") {
+        idleId = requestIdleCallback(loadUploads, { timeout: UPLOAD_DEFER_IDLE_MS });
+      }
+    }
+
     const safetyTimer = window.setTimeout(() => {
       setFiltersReady(true);
     }, FILTERS_READY_SAFETY_MS);
@@ -147,10 +189,19 @@ export function FilterProvider({ children }: { children: React.ReactNode }) {
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => {
+      if (deferTimer != null) window.clearTimeout(deferTimer);
+      if (idleId != null && typeof cancelIdleCallback !== "undefined") {
+        cancelIdleCallback(idleId);
+      }
       window.clearTimeout(safetyTimer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [refreshUploads]);
+  }, [refreshUploads, canAccess, needsUploadScope]);
+
+  useEffect(() => {
+    if (!needsUploadScope || !canAccess("upload") || uploadsSignatureRef.current !== "") return;
+    void refreshUploads();
+  }, [needsUploadScope, canAccess, refreshUploads]);
 
   useEffect(() => {
     const hasActive = uploads.some((u) => u.status === "pending" || u.status === "processing");

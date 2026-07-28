@@ -9,8 +9,8 @@ export const GAP_SKU_DISPLAY_ORDER = [
   "M10",
   "M6",
   "M6S",
-  "M2",
   "M4",
+  "M2",
 ] as const;
 
 const GAP_SKU_RANK = new Map<string, number>(

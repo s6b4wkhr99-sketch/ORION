@@ -274,6 +274,9 @@ def process_buyer_upload(
     if not parsed:
         raise UploadValidationError("No valid buyer chair rows found in file.")
 
+    # Keep stored sku_token aligned with latest parse_purchase_token rules (e.g. M6(s) → M6S).
+    reparse_stats = reparse_buyer_sku_tokens(db)
+
     new_rows, skipped_duplicates = _partition_new_purchases(db, parsed)
     if not new_rows:
         raise UploadValidationError(
@@ -327,6 +330,7 @@ def process_buyer_upload(
         "parsed_rows": len(parsed),
         "rows_inserted": len(new_rows),
         "skipped_duplicates": skipped_duplicates,
+        "sku_tokens_reparsed": reparse_stats.get("updated", 0),
         "unique_emails": len(emails),
         "matched_emails": matched_emails,
         "matched_rows": matched_rows,
@@ -444,3 +448,19 @@ def buyer_matched_rows_for_download(db: Session, upload_id: uuid.UUID) -> list[d
             }
         )
     return out
+
+
+def reparse_buyer_sku_tokens(db: Session) -> dict[str, int]:
+    """Re-derive sku_token from product_raw after parse_purchase_token rule changes."""
+    rows = db.query(BuyerPurchase).all()
+    updated = 0
+    for row in rows:
+        token = parse_purchase_token(row.product_raw)
+        if not token:
+            continue
+        if token != (row.sku_token or "").upper():
+            row.sku_token = token
+            updated += 1
+    if updated:
+        db.commit()
+    return {"total": len(rows), "updated": updated}

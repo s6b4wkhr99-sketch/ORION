@@ -70,6 +70,7 @@ make worker
 | Upload stuck at queued | Worker 없음 | `make worker` |
 | Read Only upload banner | (v1.1.0+) suppressed | 정상 — upload 권한 없음 |
 | Login 실패 | AUTH/migrate | `make migrate`, `make setup-local` |
+| **Internal Server Error (500) on /login** | `.next` 삭제 후 frontend 미재기동 | `bash scripts/dev.sh restart` — [Local_Disk_Cleanup_Guide.md](./Local_Disk_Cleanup_Guide.md) |
 
 **진단:** `bash scripts/dev.sh status` — PostgreSQL, backend, frontend, worker, API route를 한 번에 확인
 
@@ -90,9 +91,11 @@ make worker
 ## 7. 백업 / 복구
 
 ```bash
-make backup
+make backup    # → database.sql.gz (평문 sql 자동 제거)
 make restore
 ```
+
+**로컬 디스크 정리** (`.next` 삭제 후 `dev.sh restart` 필수): [Local_Disk_Cleanup_Guide.md](./Local_Disk_Cleanup_Guide.md)
 
 ---
 

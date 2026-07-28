@@ -8,8 +8,9 @@ import { CommercialIntelligencePanel } from "@/components/decision/mission-contr
 import { ExecutiveKpiRow } from "@/components/decision/mission-control/executive-kpi-row";
 import { ExpectedRevenueInfo } from "@/components/ui/info-tooltip";
 import { IntelligenceScoreDistribution } from "@/components/decision/mission-control/intelligence-score-distribution";
-import { OpportunityRadar, type OpportunityRadarPoint } from "@/components/decision/mission-control/opportunity-radar";
-import { PurchaseRadar } from "@/components/decision/mission-control/purchase-radar";
+import { type OpportunityRadarPoint } from "@/components/decision/mission-control/opportunity-radar";
+import { MissionControlOpportunitySection } from "@/components/decision/mission-control/mission-control-opportunity-section";
+import { MissionControlPurchaseSection } from "@/components/decision/mission-control/mission-control-purchase-section";
 import { OrionDnaWidget } from "@/components/decision/mission-control/orion-dna-widget";
 import { CeragemDistributionWidget, type CeragemSegmentBand } from "@/components/decision/mission-control/ceragem-distribution-widget";
 import { sortCeragemSegments } from "@/lib/ceragem-segment-recommendations";
@@ -17,10 +18,10 @@ import { RecentOpportunitiesTable, type RecentOpportunityRow } from "@/component
 import { RevenueFunnelWidget } from "@/components/decision/mission-control/revenue-funnel-widget";
 import { TodaysTopOpportunity } from "@/components/decision/mission-control/todays-top-opportunity";
 import { WidgetShell } from "@/components/decision/mission-control/widget-shell";
-import { UsChoroplethMap } from "@/components/dashboard/us-choropleth-map";
 import { PageSkeleton } from "@/components/ui/skeleton";
+import { LazyWhenVisible } from "@/components/ui/lazy-when-visible";
 import { useFilters } from "@/contexts/filter-context";
-import { api, type ExecutiveDashboardRadarOpportunity, type ExecutiveDashboardStatePerformance, type ExecutiveSummary, type PurchaseDashboard } from "@/lib/api";
+import { api, type ExecutiveDashboardRadarOpportunity, type ExecutiveDashboardStatePerformance, type ExecutiveSummary } from "@/lib/api";
 import { dashboardCacheKey, readDashboardCache, writeDashboardCache } from "@/lib/dashboard-cache";
 import { isStalePromotionCoverageCache, PROMOTION_COVERAGE_CACHE_VERSION } from "@/lib/standing-promotions";
 import { resolveOpportunityScore } from "@/lib/opportunity-targeting";
@@ -212,7 +213,6 @@ export default function MissionControlPage() {
   const router = useRouter();
   const { selectedUploadId, uploads, setSelectedUploadId, dataRevision, uploadsSignatureKey } = useFilters();
   const [data, setData] = useState<ExecutiveSummary | null>(null);
-  const [purchaseData, setPurchaseData] = useState<PurchaseDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -262,33 +262,6 @@ export default function MissionControlPage() {
       cancelled = true;
     };
   }, [selectedUploadId, dataRevision, uploadsSignatureKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    api
-      .getPurchasesDashboard()
-      .then((summary) => {
-        if (!cancelled) setPurchaseData(summary);
-      })
-      .catch(() => {
-        if (!cancelled) setPurchaseData(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dataRevision]);
-
-  const purchaseStateMap = useMemo(
-    () =>
-      (purchaseData?.purchases_by_state ?? []).map((row) => ({
-        state: row.state,
-        revenue: 0,
-        orders: row.purchase_count,
-        customers: row.unique_buyers,
-        brandLoyalty: row.brand_loyalty_index,
-      })),
-    [purchaseData],
-  );
 
   const model = useMemo(() => {
     if (!data) return null;
@@ -367,7 +340,13 @@ export default function MissionControlPage() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight text-gray-900">Mission Control</h1>
+          <p className="mt-1 text-sm text-[var(--cios-secondary)]">
+            AI-powered intelligence for maximum conversion and revenue.
+          </p>
+        </header>
         <PageSkeleton />
         <p className="text-center text-sm text-[var(--cios-secondary)]">
           Mission Control 데이터를 불러오는 중입니다…
@@ -475,79 +454,24 @@ export default function MissionControlPage() {
       />
 
       {data.commercial_intelligence && (
-        <CommercialIntelligencePanel data={data.commercial_intelligence} uploadId={selectedUploadId} />
+        <LazyWhenVisible minHeight={360}>
+          <CommercialIntelligencePanel data={data.commercial_intelligence} uploadId={selectedUploadId} />
+        </LazyWhenVisible>
       )}
 
-      <div className="grid items-stretch gap-6 xl:grid-cols-2">
-        <div className="h-full">
-          <WidgetShell
-            fill
-            title="Opportunity by State"
-            subtitle={
-              scopedUpload
-                ? `Expected Total Address Revenue by geography · ${scopedUpload.file_name} only`
-                : "Expected Total Address Revenue by geography"
-            }
-            action={
-              <Link href="/market-intelligence?view=state" className="text-xs font-medium text-indigo-600 hover:underline">
-                View State Intelligence →
-              </Link>
-            }
-          >
-            <UsChoroplethMap
-              data={model.stateMap}
-              mapHeight={551}
-              centered
-              onStateClick={(state) => router.push(`/market-intelligence?state=${encodeURIComponent(state)}`)}
-            />
-          </WidgetShell>
-        </div>
-        <div className="h-full">
-          <WidgetShell
-            fill
-            title="Opportunity Radar"
-            subtitle="Y: intelligence opportunity score · X: switch axis"
-            action={
-              <Link href="/opportunities" className="text-xs font-medium text-indigo-600 hover:underline">
-                View All Opportunities →
-              </Link>
-            }
-          >
-            <OpportunityRadar points={model.radarPoints} fill chartHeight={380} />
-          </WidgetShell>
-        </div>
-      </div>
+      <LazyWhenVisible minHeight={580}>
+        <MissionControlOpportunitySection
+          stateMap={model.stateMap}
+          radarPoints={model.radarPoints}
+          scopedUpload={scopedUpload}
+        />
+      </LazyWhenVisible>
 
-      <div className="grid items-stretch gap-6 xl:grid-cols-2">
-        <div className="h-full">
-          <WidgetShell
-            fill
-            title="Purchases by State"
-            subtitle={
-              purchaseData?.meta.other_count
-                ? `Actual device purchases by geography · OTHER: ${formatNumber(purchaseData.meta.other_count)} (${purchaseData.meta.other_pct}%)`
-                : "Actual device purchases by geography"
-            }
-          >
-            <UsChoroplethMap data={purchaseStateMap} variant="purchases" mapHeight={551} centered />
-          </WidgetShell>
-        </div>
-        <div className="h-full">
-          <WidgetShell
-            fill
-            title="Purchase Radar"
-            subtitle="Y: purchase volume score · X: switch axis"
-          >
-            <PurchaseRadar points={purchaseData?.purchase_radar ?? []} fill chartHeight={380} />
-          </WidgetShell>
-        </div>
-      </div>
+      <LazyWhenVisible minHeight={580}>
+        <MissionControlPurchaseSection />
+      </LazyWhenVisible>
 
-      {purchaseData?.meta.disclaimer ? (
-        <p className="text-center text-xs text-[var(--cios-secondary)]">{purchaseData.meta.disclaimer}</p>
-      ) : null}
-
-      <div className="grid gap-6 lg:grid-cols-3">
+      <LazyWhenVisible minHeight={420} className="grid gap-6 lg:grid-cols-3">
         <div className="h-full">
           <TodaysTopOpportunity
             state={model.topZipState}
@@ -579,9 +503,9 @@ export default function MissionControlPage() {
             <RevenueFunnelWidget stages={model.funnelStages} expectedRevenue={data.expected_revenue} />
           </WidgetShell>
         </div>
-      </div>
+      </LazyWhenVisible>
 
-      <div className="grid items-stretch gap-6 xl:grid-cols-12">
+      <LazyWhenVisible minHeight={360} className="grid items-stretch gap-6 xl:grid-cols-12">
         <div className="h-full xl:col-span-4">
           <WidgetShell
             fill
@@ -606,7 +530,7 @@ export default function MissionControlPage() {
             <OrionDnaWidget intelligenceRadar={data.intelligence_radar ?? []} />
           </WidgetShell>
         </div>
-      </div>
+      </LazyWhenVisible>
     </div>
   );
 }

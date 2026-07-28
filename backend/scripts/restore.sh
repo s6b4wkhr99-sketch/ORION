@@ -97,8 +97,13 @@ fi
 export PATH="/opt/homebrew/opt/postgresql@16/bin:/opt/homebrew/bin:$PATH"
 
 if is_postgres_url "$DATABASE_URL"; then
-  if [ ! -f "$DEST/database.sql" ] || [ ! -s "$DEST/database.sql" ]; then
-    echo "ERROR: database.sql missing or empty in backup." >&2
+  SQL_FILE=""
+  if [ -f "$DEST/database.sql.gz" ] && [ -s "$DEST/database.sql.gz" ]; then
+    SQL_FILE="$DEST/database.sql.gz"
+  elif [ -f "$DEST/database.sql" ] && [ -s "$DEST/database.sql" ]; then
+    SQL_FILE="$DEST/database.sql"
+  else
+    echo "ERROR: database.sql or database.sql.gz missing or empty in backup." >&2
     exit 1
   fi
   if ! command -v psql >/dev/null 2>&1; then
@@ -106,8 +111,16 @@ if is_postgres_url "$DATABASE_URL"; then
     exit 1
   fi
   PG_URI="$(to_pg_uri "$DATABASE_URL")"
-  echo "Restoring PostgreSQL from database.sql ..."
-  psql "$PG_URI" -v ON_ERROR_STOP=1 -f "$DEST/database.sql"
+  echo "Restoring PostgreSQL from $(basename "$SQL_FILE") ..."
+  if [[ "$SQL_FILE" == *.gz ]]; then
+    if ! command -v gunzip >/dev/null 2>&1; then
+      echo "ERROR: gunzip not found (required for database.sql.gz)." >&2
+      exit 1
+    fi
+    gunzip -c "$SQL_FILE" | psql "$PG_URI" -v ON_ERROR_STOP=1
+  else
+    psql "$PG_URI" -v ON_ERROR_STOP=1 -f "$SQL_FILE"
+  fi
   echo "  PostgreSQL restore complete."
 elif is_sqlite_url "$DATABASE_URL"; then
   if [ ! -f "$DEST/campaign_intelligence.db" ]; then

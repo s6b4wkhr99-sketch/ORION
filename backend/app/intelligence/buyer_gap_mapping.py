@@ -52,6 +52,26 @@ _V5_CERAGEM = frozenset(
 )
 
 _CHAIR_TOKEN_RE = re.compile(r"\b(V[4-9]|M2|M4|M6S?|M10|S4)\b", re.I)
+# Shopify/legacy product titles use M6(s) — generic token regex matches M6 before the (s).
+_M6S_PRODUCT_RE = re.compile(r"M6\s*\(\s*S\s*\)|\bM6S\b", re.I)
+
+
+def parse_purchase_token(material_or_sku: str | None) -> str | None:
+    """Extract chair SKU token from legacy/Shopify material text."""
+    if not material_or_sku:
+        return None
+    text = str(material_or_sku).upper()
+    if _M6S_PRODUCT_RE.search(text):
+        return "M6S"
+    match = _CHAIR_TOKEN_RE.search(text)
+    if not match:
+        return None
+    token = match.group(1).upper()
+    if token == "S4":
+        return "V4"
+    if token == "M6S":
+        return "M6S"
+    return token
 
 
 def index_level(value: float | str | None) -> str:
@@ -74,21 +94,6 @@ def index_level(value: float | str | None) -> str:
     if v >= 0.45:
         return "Medium"
     return "Low"
-
-
-def parse_purchase_token(material_or_sku: str | None) -> str | None:
-    """Extract chair SKU token from legacy/Shopify material text."""
-    if not material_or_sku:
-        return None
-    match = _CHAIR_TOKEN_RE.search(str(material_or_sku).upper())
-    if not match:
-        return None
-    token = match.group(1).upper()
-    if token == "S4":
-        return "V4"
-    if token == "M6S":
-        return "M6S"
-    return token
 
 
 def purchase_series(token: str | None) -> str | None:
