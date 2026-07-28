@@ -1,6 +1,6 @@
 # Ceragem Customer Intelligence Operating System (CIOS)
 
-**Version:** 1.1.0 · **Status:** Local Native Pilot
+**Version:** 1.4.0 · **Status:** Local Native Pilot
 
 Customer Intelligence Operating System for Ceragem and Le Frame. Implementation follows approved specifications in [`docs/`](./docs/).
 

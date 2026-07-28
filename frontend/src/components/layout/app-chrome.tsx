@@ -28,6 +28,7 @@ import { APP_NAME, APP_TAGLINE, getPrimaryNav, type NavItem } from "@/lib/config
 import type { PermissionModule } from "@/lib/access-control";
 import { useAuth } from "@/contexts/auth-context";
 import { cn } from "@/lib/utils";
+import { SiteFooter } from "./site-footer";
 
 function userInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -233,5 +234,9 @@ export function Header() {
 }
 
 export function Footer() {
-  return null;
+  return (
+    <div className="border-t border-[var(--cios-border)] bg-[var(--cios-surface)]">
+      <SiteFooter />
+    </div>
+  );
 }

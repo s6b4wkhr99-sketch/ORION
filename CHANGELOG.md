@@ -2,6 +2,28 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.4.0] — 2026-07-28
+
+### Summary
+
+Mission Control Purchase Intelligence — actual buyer purchases on map and SKU-based Purchase Radar.
+
+### Features
+
+- **Purchases by State** choropleth on Mission Control (teal palette, `buyer_purchases` data)
+- **Purchase Radar** — state × actual SKU bubbles, top 15 states per SKU
+- `GET /api/v1/dashboard/purchases` — purchase KPIs, state rollup, radar payload
+- SKU legend labels: Master V*, Master S4, Pause M* (filters by `sku_token`)
+- Shared radar layout (`RADAR_PLOT_ASPECT_RATIO`) aligned with Opportunity Radar
+- Login brand motion, site footer, legal pages (`/legal/*`)
+- USB packaging scripts (`scripts/package_usb.sh`, troubleshooting docs)
+
+### Changed
+
+- Opportunity Radar — top 10 states per product; aspect ratio via shared layout module
+- Mission Control purchase widgets — removed Buyer Upload header links
+- `Pause M2` purchase mapping fix (M2 no longer merged into Pause M6)
+
 ## [1.3.0] — 2026-07-23
 
 ### Summary

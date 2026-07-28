@@ -24,9 +24,26 @@ function albersUsaProjectionConfig(mapWidth: number, mapHeight: number) {
   };
 }
 
-const CHOROPLETH_COLORS = ["#DBEAFE", "#93C5FD", "#3B82F6", "#1D4ED8", "#1E3A8A"] as const;
+const CHOROPLETH_COLORS_OPPORTUNITY = ["#DBEAFE", "#93C5FD", "#3B82F6", "#1D4ED8", "#1E3A8A"] as const;
+/** Actual purchases — teal scale (distinct from opportunity blues). */
+const CHOROPLETH_COLORS_PURCHASES = ["#CCFBF1", "#5EEAD4", "#14B8A6", "#0F766E", "#115E59"] as const;
 const NO_DATA_COLOR = "#F3F4F6";
 const MULTI_SELECTED_FILL = "#D946EF";
+
+const VARIANT_STYLES = {
+  opportunity: {
+    colors: CHOROPLETH_COLORS_OPPORTUNITY,
+    emptyFill: "#E8F0FE",
+    hoverFill: "#0056D2",
+    pressedFill: "#0041A3",
+  },
+  purchases: {
+    colors: CHOROPLETH_COLORS_PURCHASES,
+    emptyFill: "#ECFDF5",
+    hoverFill: "#0D9488",
+    pressedFill: "#0F766E",
+  },
+} as const;
 
 type StateDatum = {
   state: string;
@@ -59,6 +76,8 @@ type UsChoroplethMapProps = {
   centerMaxWidthClass?: string;
   /** Tailwind classes for the gradient legend block below the map. */
   legendClassName?: string;
+  /** Opportunity (expected revenue) vs actual purchase counts */
+  variant?: "opportunity" | "purchases";
 };
 
 export function UsChoroplethMap({
@@ -72,6 +91,7 @@ export function UsChoroplethMap({
   centered = false,
   centerMaxWidthClass = "max-w-2xl",
   legendClassName = "mt-4 sm:mt-6",
+  variant = "opportunity",
 }: UsChoroplethMapProps) {
   const [displayState, setDisplayState] = useState<StateDatum | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
@@ -136,19 +156,24 @@ export function UsChoroplethMap({
     return map;
   }, [data]);
 
+  const variantStyle = VARIANT_STYLES[variant];
+
   const { colorScale, hasLegend } = useMemo(() => {
-    const values = data.map((d) => d.revenue).filter((v) => v > 0);
+    const palette = VARIANT_STYLES[variant];
+    const values = data
+      .map((d) => (variant === "purchases" ? (d.orders ?? d.revenue) : d.revenue))
+      .filter((v) => v > 0);
     if (!values.length) {
       return {
-        colorScale: () => "#E8F0FE",
+        colorScale: () => palette.emptyFill,
         hasLegend: false,
       };
     }
     return {
-      colorScale: scaleQuantile<string>().domain(values).range([...CHOROPLETH_COLORS]),
+      colorScale: scaleQuantile<string>().domain(values).range([...palette.colors]),
       hasLegend: true,
     };
-  }, [data]);
+  }, [data, variant]);
 
   const projectionConfig = useMemo(
     () => albersUsaProjectionConfig(MAP_WIDTH, effectiveMapHeight),
@@ -156,7 +181,11 @@ export function UsChoroplethMap({
   );
 
   if (!data.length && !multiSelect) {
-    return <p className="text-sm text-[var(--cios-secondary)]">No state revenue data for the selected upload.</p>;
+    return (
+      <p className="text-sm text-[var(--cios-secondary)]">
+        {variant === "purchases" ? "No purchase data by state." : "No state revenue data for the selected upload."}
+      </p>
+    );
   }
 
   const widthClass = centered ? `mx-auto w-full ${centerMaxWidthClass}` : "w-full";
@@ -185,7 +214,8 @@ export function UsChoroplethMap({
                 const name = String((geo.properties as { name?: string }).name ?? "");
                 const abbr = STATE_NAME_TO_ABBR[name] ?? "";
                 const row = abbr ? byState.get(abbr.toUpperCase()) : undefined;
-                const revenue = row?.revenue ?? 0;
+                const metricValue =
+                  variant === "purchases" ? (row?.orders ?? row?.revenue ?? 0) : (row?.revenue ?? 0);
                 const isSelected =
                   selectedState != null && abbr.toUpperCase() === selectedState.toUpperCase()
                     ? true
@@ -201,8 +231,8 @@ export function UsChoroplethMap({
                 const defaultFill =
                   isSelected && multiSelect
                     ? MULTI_SELECTED_FILL
-                    : revenue > 0
-                      ? colorScale(revenue)
+                    : metricValue > 0
+                      ? colorScale(metricValue)
                       : NO_DATA_COLOR;
                 return (
                   <Geography
@@ -223,11 +253,14 @@ export function UsChoroplethMap({
                         outline: "none",
                       },
                       hover: {
-                        fill: isSelected && multiSelect ? "#C026D3" : "#0056D2",
+                        fill: isSelected && multiSelect ? "#C026D3" : variantStyle.hoverFill,
                         outline: "none",
                         cursor: abbr ? "pointer" : "default",
                       },
-                      pressed: { fill: isSelected && multiSelect ? "#86198F" : "#0041A3", outline: "none" },
+                      pressed: {
+                        fill: isSelected && multiSelect ? "#86198F" : variantStyle.pressedFill,
+                        outline: "none",
+                      },
                     }}
                   />
                 );
@@ -244,20 +277,48 @@ export function UsChoroplethMap({
             style={{ transitionDuration: `${MAP_POPUP_FADE_MS}ms` }}
           >
             <p className="font-semibold text-gray-900">{displayState.state}</p>
-            {displayState.customers != null && (
-              <p className="mt-1 text-[var(--cios-secondary)]">
-                Prospect Customers:{" "}
-                <span className="font-medium text-gray-700">{displayState.customers.toLocaleString()}</span>
-              </p>
+            {variant === "purchases" ? (
+              <>
+                <p className="mt-1 text-[var(--cios-secondary)]">
+                  Purchases:{" "}
+                  <span className="font-medium text-gray-700">
+                    {(displayState.orders ?? displayState.revenue ?? 0).toLocaleString()}
+                  </span>
+                </p>
+                {displayState.customers != null && (
+                  <p className="mt-1 text-[var(--cios-secondary)]">
+                    Unique buyers:{" "}
+                    <span className="font-medium text-gray-700">{displayState.customers.toLocaleString()}</span>
+                  </p>
+                )}
+              </>
+            ) : (
+              <>
+                {displayState.customers != null && (
+                  <p className="mt-1 text-[var(--cios-secondary)]">
+                    Prospect Customers:{" "}
+                    <span className="font-medium text-gray-700">{displayState.customers.toLocaleString()}</span>
+                  </p>
+                )}
+                <p className="mt-1 text-[var(--cios-secondary)]">
+                  Expected Revenue:{" "}
+                  <span className="font-medium text-gray-700">{formatCurrency(displayState.revenue)}</span>
+                </p>
+                <p className="mt-0.5 text-[10px] italic text-[var(--cios-secondary)]">
+                  Probability-weighted (customers × conversion × price)
+                </p>
+                {displayState.orders != null && (
+                  <p className="mt-1 text-[var(--cios-secondary)]">
+                    Orders: {Math.round(displayState.orders).toLocaleString()}
+                  </p>
+                )}
+                {displayState.conversion != null && (
+                  <p className="mt-1 text-[var(--cios-secondary)]">
+                    Conversion: {formatPercent(displayState.conversion)}
+                  </p>
+                )}
+              </>
             )}
-            <p className="mt-1 text-[var(--cios-secondary)]">
-              Expected Revenue: <span className="font-medium text-gray-700">{formatCurrency(displayState.revenue)}</span>
-            </p>
-            <p className="mt-0.5 text-[10px] italic text-[var(--cios-secondary)]">
-              Probability-weighted (customers × conversion × price)
-            </p>
-            {displayState.orders != null && <p className="mt-1 text-[var(--cios-secondary)]">Orders: {Math.round(displayState.orders).toLocaleString()}</p>}
-            {displayState.conversion != null && <p className="mt-1 text-[var(--cios-secondary)]">Conversion: {formatPercent(displayState.conversion)}</p>}
           </div>
         )}
       </div>
@@ -270,14 +331,16 @@ export function UsChoroplethMap({
               Selected states ({selectedStates.length})
             </p>
           ) : null}
-          <p className="mb-1 text-[10px] font-medium text-gray-700">Expected Opportunity</p>
+          <p className="mb-1 text-[10px] font-medium text-gray-700">
+            {variant === "purchases" ? "Purchase volume" : "Expected Opportunity"}
+          </p>
           {/* Bar and Low/High labels share ONE fixed-width wrapper so they always keep identical
               bounds and stay aligned on every device (no reliance on matching per-element caps). */}
           <div className="w-40 max-w-full">
             <div
               className="h-2 w-full rounded-sm"
               style={{
-                background: `linear-gradient(to right, ${CHOROPLETH_COLORS.join(", ")})`,
+                background: `linear-gradient(to right, ${variantStyle.colors.join(", ")})`,
               }}
             />
             <div className="mt-1 flex w-full justify-between text-[9px] text-[var(--cios-secondary)]">

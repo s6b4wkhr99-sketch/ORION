@@ -13,6 +13,13 @@ import {
   productColor,
 } from "@/lib/product-visual";
 import {
+  RADAR_CHART_MARGIN,
+  RADAR_MAX_BUBBLE_R,
+  RADAR_MIN_BUBBLE_R,
+  RADAR_PLOT_ASPECT_RATIO,
+  RADAR_SCORE_AXIS_TICKS,
+} from "@/lib/radar-chart-layout";
+import {
   RADAR_SPREAD_X_AXES,
   radarXDomain,
   radarXScore,
@@ -102,22 +109,14 @@ const RADAR_DIMENSIONS: RadarDimension[] = [
 
 export const RADAR_TOP_STATE_COUNT = 10;
 
-/** Score axis labels — 20–100 at 20-point steps; origin (0) stays unlabeled. */
-const RADAR_SCORE_AXIS_TICKS = [20, 40, 60, 80, 100];
-
-const MIN_BUBBLE_R = 10;
-const MAX_BUBBLE_R = 38;
+const MIN_BUBBLE_R = RADAR_MIN_BUBBLE_R;
+const MAX_BUBBLE_R = RADAR_MAX_BUBBLE_R;
 
 const RADAR_POPUP_AUTO_HIDE_MS = 2000;
 const RADAR_POPUP_FADE_MS = 300;
 
 /** Room for largest bubble radius + stroke so SVG plot clip does not cut high-score points. */
-const CHART_MARGIN = {
-  top: MAX_BUBBLE_R + 14,
-  right: MAX_BUBBLE_R + 14,
-  bottom: 32,
-  left: MAX_BUBBLE_R + 28,
-};
+const CHART_MARGIN = RADAR_CHART_MARGIN;
 
 const Y_AXIS_LABEL = "Intelligence Opportunity Score";
 
@@ -301,8 +300,8 @@ export function OpportunityRadar({
       </div>
 
       <div
-        className={cn("relative", fill ? "min-h-0 flex-1" : "")}
-        style={fill ? { minHeight: chartHeight } : { height: chartHeight }}
+        className="relative w-full shrink-0"
+        style={{ aspectRatio: RADAR_PLOT_ASPECT_RATIO }}
       >
         {visiblePoints.length === 0 ? (
           <div className="flex h-full items-center justify-center text-sm text-[var(--cios-secondary)]">

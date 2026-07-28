@@ -9,6 +9,7 @@ import { ExecutiveKpiRow } from "@/components/decision/mission-control/executive
 import { ExpectedRevenueInfo } from "@/components/ui/info-tooltip";
 import { IntelligenceScoreDistribution } from "@/components/decision/mission-control/intelligence-score-distribution";
 import { OpportunityRadar, type OpportunityRadarPoint } from "@/components/decision/mission-control/opportunity-radar";
+import { PurchaseRadar } from "@/components/decision/mission-control/purchase-radar";
 import { OrionDnaWidget } from "@/components/decision/mission-control/orion-dna-widget";
 import { CeragemDistributionWidget, type CeragemSegmentBand } from "@/components/decision/mission-control/ceragem-distribution-widget";
 import { sortCeragemSegments } from "@/lib/ceragem-segment-recommendations";
@@ -19,7 +20,7 @@ import { WidgetShell } from "@/components/decision/mission-control/widget-shell"
 import { UsChoroplethMap } from "@/components/dashboard/us-choropleth-map";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { useFilters } from "@/contexts/filter-context";
-import { api, type ExecutiveDashboardRadarOpportunity, type ExecutiveDashboardStatePerformance, type ExecutiveSummary } from "@/lib/api";
+import { api, type ExecutiveDashboardRadarOpportunity, type ExecutiveDashboardStatePerformance, type ExecutiveSummary, type PurchaseDashboard } from "@/lib/api";
 import { dashboardCacheKey, readDashboardCache, writeDashboardCache } from "@/lib/dashboard-cache";
 import { isStalePromotionCoverageCache, PROMOTION_COVERAGE_CACHE_VERSION } from "@/lib/standing-promotions";
 import { resolveOpportunityScore } from "@/lib/opportunity-targeting";
@@ -211,6 +212,7 @@ export default function MissionControlPage() {
   const router = useRouter();
   const { selectedUploadId, uploads, setSelectedUploadId, dataRevision, uploadsSignatureKey } = useFilters();
   const [data, setData] = useState<ExecutiveSummary | null>(null);
+  const [purchaseData, setPurchaseData] = useState<PurchaseDashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -260,6 +262,32 @@ export default function MissionControlPage() {
       cancelled = true;
     };
   }, [selectedUploadId, dataRevision, uploadsSignatureKey]);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .getPurchasesDashboard()
+      .then((summary) => {
+        if (!cancelled) setPurchaseData(summary);
+      })
+      .catch(() => {
+        if (!cancelled) setPurchaseData(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dataRevision]);
+
+  const purchaseStateMap = useMemo(
+    () =>
+      (purchaseData?.purchases_by_state ?? []).map((row) => ({
+        state: row.state,
+        revenue: 0,
+        orders: row.purchase_count,
+        customers: row.unique_buyers,
+      })),
+    [purchaseData],
+  );
 
   const model = useMemo(() => {
     if (!data) return null;
@@ -449,7 +477,7 @@ export default function MissionControlPage() {
         <CommercialIntelligencePanel data={data.commercial_intelligence} uploadId={selectedUploadId} />
       )}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid items-stretch gap-6 xl:grid-cols-2">
         <div className="h-full">
           <WidgetShell
             fill
@@ -489,6 +517,35 @@ export default function MissionControlPage() {
         </div>
       </div>
 
+      <div className="grid items-stretch gap-6 xl:grid-cols-2">
+        <div className="h-full">
+          <WidgetShell
+            fill
+            title="Purchases by State"
+            subtitle={
+              purchaseData?.meta.other_count
+                ? `Actual chair purchases by geography · OTHER: ${formatNumber(purchaseData.meta.other_count)} (${purchaseData.meta.other_pct}%)`
+                : "Actual chair purchases by geography (not expected revenue)"
+            }
+          >
+            <UsChoroplethMap data={purchaseStateMap} variant="purchases" mapHeight={551} centered />
+          </WidgetShell>
+        </div>
+        <div className="h-full">
+          <WidgetShell
+            fill
+            title="Purchase Radar"
+            subtitle="Y: purchase volume score · X: switch axis (actual purchases)"
+          >
+            <PurchaseRadar points={purchaseData?.purchase_radar ?? []} fill chartHeight={380} />
+          </WidgetShell>
+        </div>
+      </div>
+
+      {purchaseData?.meta.disclaimer ? (
+        <p className="text-center text-xs text-[var(--cios-secondary)]">{purchaseData.meta.disclaimer}</p>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="h-full">
           <TodaysTopOpportunity
@@ -517,20 +574,16 @@ export default function MissionControlPage() {
             fill
             title="Revenue Funnel"
             subtitle="Opportunity to revenue progression"
-            action={
-              <Link href="/campaigns" className="text-xs font-medium text-indigo-600 hover:underline">
-                View Funnel Analysis →
-              </Link>
-            }
           >
             <RevenueFunnelWidget stages={model.funnelStages} expectedRevenue={data.expected_revenue} />
           </WidgetShell>
         </div>
       </div>
 
-      <div className="grid items-start gap-6 xl:grid-cols-12">
-        <div className="xl:col-span-4">
+      <div className="grid items-stretch gap-6 xl:grid-cols-12">
+        <div className="h-full xl:col-span-4">
           <WidgetShell
+            fill
             title="Recent Opportunities"
             subtitle="Top 6 intelligence-weighted opportunities"
             action={

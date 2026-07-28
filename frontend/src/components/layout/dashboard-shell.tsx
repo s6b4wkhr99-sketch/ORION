@@ -8,7 +8,7 @@ import { AuthGate } from "@/components/auth/auth-gate";
 import { ToastProvider } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/config";
-import { Sidebar } from "./app-chrome";
+import { Footer, Sidebar } from "./app-chrome";
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const [navCollapsed, setNavCollapsed] = useState(false);
@@ -83,6 +83,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             <div className="mx-auto max-w-[1600px] p-4 sm:p-6">
               <FiltersReadyGate>{children}</FiltersReadyGate>
             </div>
+            <Footer />
           </main>
         </div>
         </ToastProvider>

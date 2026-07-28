@@ -1,8 +1,8 @@
 # Volume 31 — Development Status Report (개발 현황 보고서)
 
-**Version:** 1.3.0  
-**Report Date:** 2026-07-23  
-**Status:** CI E2E + PG acceptance + production deploy workflow (v1.3.0)  
+**Version:** 1.4.0  
+**Report Date:** 2026-07-28  
+**Status:** Mission Control Purchase Intelligence (v1.4.0)  
 **Audience:** 개발자, PM, QA, 운영
 
 ---
@@ -23,7 +23,7 @@
 
 | 항목 | 값 |
 |------|-----|
-| **애플리케이션 버전** | **1.3.0** |
+| **애플리케이션 버전** | **1.4.0** |
 | 이전 공식 릴리스 | 1.2.0 (2026-07-23) |
 | Git | `main` @ GitHub [s6b4wkhr99-sketch/ORION](https://github.com/s6b4wkhr99-sketch/ORION) |
 | DB 마이그레이션 | Alembic `0018_user_allowed_modules` (head) |
@@ -202,6 +202,7 @@ Async upload 사용 시 별도 터미널: `make worker`
 
 | Version | Date | Summary |
 |---------|------|---------|
+| 1.4.0 | 2026-07-28 | Mission Control Purchase Intelligence — Purchases by State, SKU-based Purchase Radar |
 | 1.3.0 | 2026-07-23 | E2E in CI, PostgreSQL acceptance, production deploy workflow |
 | 1.2.0 | 2026-07-23 | QA deploy workflow, secret validation, data assets out of Git, compose smoke |
 | 1.1.3 | 2026-07-23 | CI smoke fix, Upload cancel UI, doc sync, GitHub SSH helpers |

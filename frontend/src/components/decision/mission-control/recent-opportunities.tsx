@@ -32,8 +32,8 @@ export function RecentOpportunitiesTable({ rows }: { rows: RecentOpportunityRow[
   }
 
   return (
-    <div className="flex flex-col">
-      <div className="overflow-x-auto">
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1 overflow-x-auto">
       <table className="w-max max-w-full table-auto border-separate border-spacing-0 text-xs">
         <thead>
           <tr className="border-b border-gray-100 text-center">

@@ -1,6 +1,6 @@
 export const APP_NAME = "ORION";
 export const APP_TAGLINE = "Campaign Decision Intelligence";
-export const APP_VERSION = "1.3.0";
+export const APP_VERSION = "1.4.0";
 
 import { hasModule, type PermissionModule } from "@/lib/access-control";
 
@@ -166,6 +166,7 @@ export const PRODUCT_LEGEND_ORDER = [
   "Pause M6",
   "Pause M6s",
   "Pause M4",
+  "Pause M2",
 ] as const;
 
 export function sortProductsForLegend(products: string[]): string[] {

@@ -333,6 +333,7 @@ export const api = {
   },
   getExecutive: (uploadId?: string) =>
     fetchJsonDeduped<ExecutiveSummary>(`/dashboard/executive${uploadId ? `?upload_id=${uploadId}` : ""}`),
+  getPurchasesDashboard: () => fetchJsonDeduped<PurchaseDashboard>("/dashboard/purchases"),
   getPromotionCoverage: (uploadId?: string) =>
     fetchJson<PromotionCoverageSnapshot>(
       `/dashboard/promotion-coverage${uploadId ? `?upload_id=${uploadId}` : ""}`,
@@ -932,6 +933,49 @@ export type ExecutiveSummary = {
   pricing_version?: string;
   commercial_intelligence?: CommercialIntelligenceSummary;
   scoped_upload_id?: string | null;
+};
+
+export type PurchaseStateRow = {
+  state: string;
+  purchase_count: number;
+  unique_buyers: number;
+  purchase_share_pct: number;
+  top_sku_token: string | null;
+  shopify_count: number;
+  legacy_count: number;
+};
+
+export type PurchaseRadarRow = {
+  id: string;
+  label: string;
+  state: string;
+  sku_token: string;
+  product: string;
+  purchase_count: number;
+  unique_buyers: number;
+  purchase_volume_score: number;
+  state_volume_score: number;
+  buyer_density_score: number;
+  national_share_pct: number;
+};
+
+export type PurchaseDashboard = {
+  kpis: {
+    purchase_row_count: number;
+    unique_buyer_emails: number;
+    top_purchase_state: string | null;
+    top_sku_token: string | null;
+    shopify_purchase_pct: number;
+    prospect_match_rate_pct: number;
+  };
+  purchases_by_state: PurchaseStateRow[];
+  purchase_radar: PurchaseRadarRow[];
+  meta: {
+    other_count: number;
+    other_pct: number;
+    buyer_upload_batches: number;
+    disclaimer: string;
+  };
 };
 
 export type CommercialSkuHighlight = {

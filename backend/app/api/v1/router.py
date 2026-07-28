@@ -1073,6 +1073,13 @@ def dashboard_executive(upload_id: str | None = None, db: Session = Depends(get_
     return ok(get_executive_summary(db, upload_id))
 
 
+@router.get("/dashboard/purchases")
+def dashboard_purchases(db: Session = Depends(get_db), _user: dict = Depends(require_dashboard)):
+    from app.campaign.purchase_dashboard import get_purchase_dashboard
+
+    return ok(get_purchase_dashboard(db))
+
+
 @router.get("/dashboard/promotion-coverage")
 def dashboard_promotion_coverage(
     upload_id: str | None = None,

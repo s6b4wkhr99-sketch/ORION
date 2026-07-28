@@ -7,6 +7,14 @@ Cursor and developers must follow the documents applicable to the **current deve
 
 ---
 
+## Customer & Executive (시스템 소개)
+
+| Document | Title |
+|----------|-------|
+| [CIOS_System_Introduction.md](./CIOS_System_Introduction.md) | **CIOS / ORION 시스템 소개서** — 개발 의도, Intelligence 로직, Reference Data, 분별력 (고객·의사결정자용) |
+
+---
+
 ## Le Frame — Active Development (Current)
 
 | Volume | Document | Title |

@@ -20,6 +20,7 @@ export const PRODUCT_COLORS: Record<string, string> = {
   "Pause M6": "#F59E0B",
   "Pause M6s": "#FB923C",
   "Pause M4": "#EAB308",
+  "Pause M2": "#92400E",
   default: "#64748B",
 };
 
@@ -64,7 +65,11 @@ export function productChoroplethColors(product: string, steps = 5): string[] {
 
 export function productLegendOrder(products: Iterable<string>): string[] {
   const seen = new Set(products);
-  return PRODUCT_LEGEND_ORDER.filter((product) => seen.has(product));
+  const ordered = PRODUCT_LEGEND_ORDER.filter((product) => seen.has(product));
+  for (const product of seen) {
+    if (!ordered.includes(product)) ordered.push(product);
+  }
+  return ordered;
 }
 
 export function splitProductLegend(_products: string[]) {
