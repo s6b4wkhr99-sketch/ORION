@@ -4,6 +4,9 @@
 **Package:** `LeFrame_Dev` USB · **`ORION-v1.5.0`** (only)  
 **GitHub:** https://github.com/s6b4wkhr99-sketch/ORION
 
+> **터미널 번호 순 설치 (권장):**  
+> **[Other_Mac_Install_Runbook.md](./Other_Mac_Install_Runbook.md)** — 0→1→2→3→4A/4B→5→6 순서 + 단계별 **주의 & Troubleshooting**
+
 ---
 
 ## 0. 두 가지 설치 옵션 — 먼저 선택하세요

@@ -1,5 +1,7 @@
-ORION v1.5.0 — Other Mac install verify (after Option 1 or 2)
+ORION v1.5.0 — Other Mac install verify (after Option A or B)
 ==============================================================
+
+Primary install steps: INSTALL-RUNBOOK.md  (or docs/Other_Mac_Install_Runbook.md)
 
 Run on the OTHER Mac after: make setup-local && postgres-up && (restore+) migrate && dev.sh start
 
@@ -19,7 +21,7 @@ Run on the OTHER Mac after: make setup-local && postgres-up && (restore+) migrat
    # Expect: login HTTP 200
    # If 500: bash scripts/dev.sh restart
 
-5) Option 1 only — DB counts
+5) Option A only — DB counts
    cd ~/ORION/backend && source .venv/bin/activate
    python -c "
 from app.database import SessionLocal
@@ -31,7 +33,7 @@ db.close()
 "
    # Expect: customers ~2,611,472 · buyer_purchases ~5,289
 
-6) Backup on disk (Option 1)
+6) Backup on disk (Option A)
    ls ~/ORION/backend/backups/*/database.sql.gz
    # make restore reads .gz automatically
 
@@ -39,4 +41,4 @@ db.close()
    http://127.0.0.1:3002/login
    user@company.com / Ceragem2026!Adm
 
-TROUBLESHOOTING: docs/Other_Mac_Native_Troubleshooting.md
+TROUBLESHOOTING: docs/Other_Mac_Install_Runbook.md (per-step) + docs/Other_Mac_Native_Troubleshooting.md

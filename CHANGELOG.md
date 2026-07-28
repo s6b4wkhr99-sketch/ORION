@@ -2,6 +2,33 @@
 
 All notable releases of Ceragem CIOS follow [Semantic Versioning](https://semver.org/) and Volume 25 Git Workflow.
 
+## [1.5.1] — 2026-07-28
+
+### Summary
+
+Mission Control performance UX, buyer M6(s) parsing, Market Intelligence Sellable Products, USB install runbook, and SKU Catalog admin updates.
+
+### Features
+
+- **Mission Control loading** — auth optimistic sidebar; lazy-load maps, purchase, and commercial widgets; defer upload list on Admin/Buyer routes
+- **Opportunity layout** — 2-column Opportunity by State + Opportunity Radar (matches Purchases row)
+- **Buyer M6(s) parsing** — Shopify `M6(s)` titles map to `sku_token = M6S`; `reparse_buyer_sku_tokens()` runs on every Buyer Upload
+- **Market Intelligence** — state-scoped **Sellable Products** (`SellableProductsSection` shared with Metro view)
+- **Other Mac Install Runbook** — numbered terminal steps (Option A/B) with per-step troubleshooting
+- **SKU Catalog admin** — MSRP → Promo → Gross → LE Frame 15% → Net Profit waterfall columns
+
+### Changed
+
+- Purchase Radar legend order: Pause M10 → M6 → M6s → M4 → M2
+- Removed Purchase dashboard footer disclaimer
+- USB packaging (`ORION-v1.5.0`), `dev.sh` restart fix, disk cleanup and ORION DNA integration docs
+- `scripts/package_usb.sh` refresh flow and compressed backup support
+
+### Fixed
+
+- `LazyWhenVisible` grid class lost after scroll-in (Opportunity widgets stacked vertically)
+- Internal Server Error after deleting `.next` without restart (documented + `dev.sh` guard)
+
 ## [1.5.0] — 2026-07-28
 
 ### Summary

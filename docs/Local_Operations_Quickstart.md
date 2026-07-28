@@ -148,3 +148,5 @@ First-time E2E: `cd frontend && npm install && npx playwright install chromium`
 - [Deploy Prep Quickstart (Phase C)](./Deploy_Prep_Quickstart.md)
 - [CHANGELOG.md](../CHANGELOG.md)
 - [Volume 27 — As-Built](./27_Development_Completion_Specification.md)
+
+- [Other Mac — Install Runbook (numbered)](./Other_Mac_Install_Runbook.md)
