@@ -3,7 +3,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-USB_ROOT="${USB_ROOT:-/Volumes/LeFrame_Dev/ORION-v1.3.1}"
+USB_ROOT="${USB_ROOT:-/Volumes/LeFrame_Dev/ORION-v1.5.0}"
 DOCS="$USB_ROOT/docs"
 SRC="$ROOT/docs/Other_Mac_Native_Troubleshooting.md"
 QUICKSTART="$ROOT/docs/Local_Operations_Quickstart.md"

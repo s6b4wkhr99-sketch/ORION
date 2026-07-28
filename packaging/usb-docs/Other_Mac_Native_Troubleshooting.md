@@ -1,10 +1,12 @@
 # 다른 Mac — 로컬 네이티브 운영 Troubleshooting
 
-**Version:** 1.3.0 · **Updated:** 2026-07-24  
+**Version:** 1.5.0 · **Updated:** 2026-07-28  
 **대상:** USB(`LeFrame_Dev`) 또는 GitHub에서 ORION을 **다른 Mac**에 복사해 네이티브로 운영할 때
 
 이 문서는 실제 다른 Mac(Les-Mac-Pro) 세팅·운영 중 발생한 문제를 **상황별**로 정리했습니다.  
 **공식 빠른 시작:** [Local_Operations_Quickstart.md](./Local_Operations_Quickstart.md)
+
+> **v1.5.0 참고:** Alembic head는 `0019_buyer_source_row_key`입니다. USB 패키지 폴더 예: `ORION-v1.5.0/source`.
 
 ---
 
@@ -13,7 +15,7 @@
 모든 문제에서 **아래 4가지**를 먼저 확인하세요.
 
 ```bash
-cd ~/ORION/source          # ← 프로젝트 루트 (Makefile 있는 폴더)
+cd ~/ORION                 # Makefile 있는 프로젝트 루트 (이중 복사면 ~/ORION/source)
 bash scripts/dev.sh status # PostgreSQL / Backend / Frontend / Worker
 ```
 
@@ -27,7 +29,7 @@ bash scripts/dev.sh status # PostgreSQL / Backend / Frontend / Worker
 **DB 데이터 확인:**
 
 ```bash
-cd ~/ORION/source/backend && source .venv/bin/activate
+cd ~/ORION/backend && source .venv/bin/activate
 python << 'EOF'
 from app.database import SessionLocal
 from sqlalchemy import text
@@ -49,9 +51,9 @@ EOF
 ### 1.1 폴더 복사 (USB)
 
 ```bash
-cp -R "/Volumes/LeFrame_Dev/ORION-v1.3.0/source" ~/ORION
+cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.0/source" ~/ORION
 mkdir -p ~/ORION/backend/backups
-cp -R "/Volumes/LeFrame_Dev/ORION-v1.3.0/backups/"* ~/ORION/backend/backups/
+cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.0/backups/"* ~/ORION/backend/backups/
 ```
 
 **작업 디렉터리:** `~/ORION` (Makefile, `backend/`, `frontend/`가 **바로** 여기 있어야 함)
@@ -79,7 +81,7 @@ make postgres-up                         # Docker 사용 시 Docker Desktop 실�
 | 순서 | 하면 안 되는 이유 |
 |------|-------------------|
 | **restore 전에 migrate** | 새 테이블(`buyer_purchases` 등)이 생긴 뒤 restore가 DROP에 실패 |
-| **migrate 생략** | `users.allowed_modules` 등 v1.3.0 컬럼 누락 → Backend 기동 실패 |
+| **migrate 생략** | `users.allowed_modules`, `buyer_purchases.source_row_key` 등 v1.5 컬럼 누락 → Backend/API 500 |
 
 **DB 처음부터 다시 넣기 (표준 절차):**
 
@@ -174,13 +176,14 @@ make setup-local
 
 ## 3. DB · 마이그레이션 · 복원
 
-### 3.1 Backend 기동 실패 — `users.allowed_modules does not exist`
+### 3.1 Backend 기동 실패 — `users.allowed_modules does not exist` / API 500
 
 | 항목 | 내용 |
 |------|------|
-| **증상** | `dev.sh start` → `Servers did not become ready`, backend.log에 `UndefinedColumn: allowed_modules` |
-| **원인** | 백업(2026-07-07) 스키마 + v1.3.0 코드 — migrate 미적용 |
+| **증상** | `dev.sh start` → `Servers did not become ready`, backend.log에 `UndefinedColumn: allowed_modules` 또는 `source_row_key` |
+| **원인** | 백업(구 스키마) + v1.5 코드 — **migrate 미적용** |
 | **해결** | `cd ~/ORION && make migrate && bash scripts/dev.sh restart` |
+| **확인** | `cd backend && .venv/bin/alembic current` → head **`0019_buyer_source_row_key`** |
 
 ---
 
@@ -216,7 +219,7 @@ cd ~/ORION
 USB 백업만 다시 받을 때:
 
 ```bash
-cp -R "/Volumes/LeFrame_Dev/ORION-v1.3.0/backups/"* ~/ORION/backend/backups/
+cp -R "/Volumes/LeFrame_Dev/ORION-v1.5.0/backups/"* ~/ORION/backend/backups/
 ```
 
 ---
@@ -274,26 +277,91 @@ EOF
 
 ## 5. 대시보드 · UI
 
-### 5.1 Mission Control — `Load failed` / `Failed to load mission control`
+### 5.1 상황 — Mission Control · Opportunity Finder 동시 `Load failed`
 
-| 항목 | 내용 |
-|------|------|
-| **증상** | 로그인은 되나 Mission Control 빈 화면 + Load failed |
-| **원인** | Backend API 실패, DB 비어 있음, 또는 migrate 누락 |
-| **해결 순서** | |
+다른 Mac으로 옮긴 뒤 **로그인은 되는데** 아래 두 화면에서 Load failed / Simulation failed가 **함께** 나오는 경우가 많습니다.
 
-1. `bash scripts/dev.sh status` — Backend `[OK]` 확인  
-2. §0 DB 고객 수 확인 — **0이면** §1.3 DB 재복원  
-3. `make migrate && bash scripts/dev.sh restart`  
-4. customers 수백만이면 **첫 로딩 2~5분** 대기 후 새로고침  
+| 화면 | 실패 API | 사용자에게 보이는 메시지 |
+|------|----------|-------------------------|
+| **Mission Control** | `GET /api/v1/dashboard/executive` | `Failed to load mission control` / Load failed |
+| **Opportunity Finder** | `POST /api/v1/campaign/opportunity-simulate` | `Simulation failed` / Load failed |
+
+**왜 동시에 실패하나**
+
+- 두 화면 모두 **Prospect 고객 DB**(`customers` + intelligence rollup)에 의존합니다.
+- GitHub clone만 하거나 USB에서 **코드만** 복사하고 `make restore`를 하지 않으면 `customers = 0` → executive API가 실패합니다.
+- **migrate 누락**이면 Backend는 떠도 API가 500을 반환합니다.
+- **Purchase Radar**(`GET /dashboard/purchases`)만 실패해도 Mission Control **일부** 위젯만 비어 있고, **전체 Load failed**는 보통 executive API 문제입니다.
+
+**브라우저 접속 주의:** `http://127.0.0.1:3002/login` 또는 `http://localhost:3002` 사용. 다른 호스트/IP로 열면 `Failed to fetch — cannot reach the API`가 날 수 있습니다.
+
+---
+
+### 5.2 해결 — Load failed 표준 복구 순서
+
+**1단계 — 30초 진단**
 
 ```bash
-tail -40 ~/ORION/.dev/logs/backend.log
+cd ~/ORION
+bash scripts/dev.sh status
+pg_isready -h 127.0.0.1 -p 5432
+curl -s http://127.0.0.1:8000/api/v1/health
+```
+
+§0 **DB 고객 수** 확인 — `customers: 0` 이면 2단계로.
+
+**2단계 — migrate + 재시작 (customers > 0 인데도 실패할 때)**
+
+```bash
+cd ~/ORION
+make migrate
+bash scripts/dev.sh restart
+```
+
+**3단계 — DB 재복원 (customers = 0 일 때)**
+
+§1.3 **DB 처음부터 다시 넣기** (`DROP DATABASE` → `make restore` → `make migrate` → `dev.sh start`).
+
+> GitHub에서 clone한 경우: `backend/backups/` SQL이 없으면 Upload Center에서 Prospect 파일을 새로 업로드하거나, USB `backups/`를 복사한 뒤 restore 하세요.
+
+**4단계 — 대용량 DB 첫 로딩**
+
+- `customers`가 **수백만**이면 `GET /dashboard/executive` 첫 응답에 **2~5분** 걸릴 수 있습니다.
+- 그 전에 여러 번 새로고침하면 Load failed처럼 보일 수 있으니 **한 번 기다린 뒤** 새로고침하세요.
+
+**5단계 — 로그·Network로 원인 좁히기**
+
+```bash
+tail -80 ~/ORION/.dev/logs/backend.log
+```
+
+브라우저 **DevTools → Network**에서 `/dashboard/executive`, `/campaign/opportunity-simulate` 의 HTTP status 확인.
+
+| status / 로그 | 의미 | 조치 |
+|---------------|------|------|
+| `(failed) net::ERR_CONNECTION_REFUSED` | Backend 미동작 | §4.1 `dev.sh start` |
+| **401** | 토큰 만료 | 재로그인 |
+| **403** | 역할/메뉴 권한 | `/admin/users`에서 `dashboard` 모듈 확인 |
+| **500** + `allowed_modules` / `source_row_key` | migrate 누락 | `make migrate` |
+| **500** + SQL 오류 | restore/migrate 순서 오류 | §1.3 DB 재복원 |
+| **200**인데 UI만 빈 경우 | rollup 빌드 중 | 2~5분 대기 후 새로고침 |
+
+**한 번에 실행 (Load failed 발생 시 권장 순서)**
+
+```bash
+cd ~/ORION
+bash scripts/dev.sh stop
+pg_isready -h 127.0.0.1 -p 5432 || brew services start postgresql@16
+make migrate
+bash scripts/dev.sh status
+# customers = 0 이면: make restore && make migrate
+bash scripts/dev.sh start
+open http://127.0.0.1:3002/mission-control
 ```
 
 ---
 
-### 5.2 Market Intelligence — 지도가 거의 회색
+### 5.3 Market Intelligence — 지도가 거의 회색
 
 | 항목 | 내용 |
 |------|------|
@@ -361,7 +429,9 @@ dev.sh status → backend.log → customers COUNT → migrate/restore 순서 확
 | restore FK 오류 | 3.2 | DB DROP → **restore → migrate** |
 | Login failed | 4.1 | `dev.sh start`, Backend 확인 |
 | Invalid credentials | 4.2 | 비밀번호 reset 스크립트 |
-| Mission Control Load failed | 5.1 | DB 복원 + migrate + Backend |
+| Mission Control / Opportunity Finder Load failed | 5.1–5.2 | `dev.sh status` → customers COUNT → restore → migrate → restart |
+| `Failed to fetch` / API unreachable | 5.1 | Backend 8000, `127.0.0.1:3002` 접속 |
+| Executive 첫 로딩 느림 | 5.2 | customers 많으면 2~5분 대기 |
 | Upload queued 멈춤 | 6.1 | `make worker` |
 | customers = 0 | 1.3 | `make restore` (migrate **후**가 아님 **전**) |
 
