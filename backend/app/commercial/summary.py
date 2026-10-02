@@ -15,6 +15,7 @@ from app.campaign.standing_promo_demand import (
 from app.intelligence.promo_price_response import (
     aggregate_conservative_promo_coverage,
     load_promo_coverage_cohort_rows,
+    rematch_product_rows_confirmed_s4_pain_v5,
 )
 from app.commercial.catalog import active_products, get_runtime_version, product_by_code
 from app.commercial.engine import build_commercial_kpis, default_promotion_amount
@@ -154,10 +155,7 @@ def _promotion_coverage(
             kpi_basis = "primary_sku_direct"
         provisional = 0
         provisional_basis = None
-        if product_code == "Master V5":
-            provisional = int(fit.get("v5_from_s4_pain") or 0)
-            provisional_basis = "s4_pain_furniture_overlap" if provisional else None
-        elif product_code == "Master S4":
+        if product_code == "Master S4":
             provisional = int(fit.get("s4_furniture_unassigned") or 0)
             provisional_basis = "unassigned_furniture_outreach" if provisional else None
 
@@ -230,7 +228,7 @@ def build_promotion_coverage_snapshot(
         targetable_customers=targetable,
     )
     return {
-        "promotion_coverage_version": "conservative-v1",
+        "promotion_coverage_version": "conservative-v3-v5-confirmed",
         "promotion_coverage": coverage,
         "db_customers": int(targetable or sum(product_counts.values())),
     }
@@ -276,6 +274,11 @@ def build_commercial_intelligence_summary(
     pp_bands: dict[str, float] | None = None,
 ) -> dict:
     product_rows = merge_standing_promo_product_rows(product_rows)
+    cohort_rows = load_promo_coverage_cohort_rows(db, upload_id)
+    if isinstance(cohort_rows, list) and cohort_rows and all(isinstance(row, dict) for row in cohort_rows[:3]):
+        opportunity_rows = rematch_product_rows_confirmed_s4_pain_v5(product_rows, cohort_rows)
+    else:
+        opportunity_rows = product_rows
     catalog_rows = _catalog_kpis()
     version = get_runtime_version() or COMMERCIAL_VERSION
 
@@ -303,13 +306,13 @@ def build_commercial_intelligence_summary(
     highest_opportunity = pick_highest_conversion_opportunity(
         db,
         upload_id,
-        product_rows,
+        opportunity_rows,
         segments,
         purchase_power,
         targetable_customers=targetable_customers,
     )
     if not highest_opportunity:
-        standing_opportunity_rows = build_standing_promo_opportunity_rows(db, upload_id, product_rows)
+        standing_opportunity_rows = build_standing_promo_opportunity_rows(db, upload_id, opportunity_rows)
         highest_opportunity = standing_opportunity_rows[0] if standing_opportunity_rows else None
         if not highest_opportunity:
             by_revenue = sorted(product_rows, key=lambda r: float(r.get("revenue") or 0), reverse=True)
@@ -336,7 +339,7 @@ def build_commercial_intelligence_summary(
         "promotion_coverage": _promotion_coverage(
             db, upload_id, product_rows, targetable_customers=targetable_customers
         ),
-        "promotion_coverage_version": "conservative-v1",
+        "promotion_coverage_version": "conservative-v3-v5-confirmed",
         "promo_policy_version": "2026.07-promo-policy-v2",
         "commercial_health_score": _commercial_health_score(catalog_rows, product_rows),
         "highest_margin_sku": _sku_highlight(highest_margin),

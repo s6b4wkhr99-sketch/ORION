@@ -31,6 +31,20 @@ export function indexPercent(value: number | null | undefined): number {
   return value <= 1 ? value * 100 : value;
 }
 
+export function effectiveRecommendedProduct(customer: {
+  recommended_product?: string | null;
+  ceragem_segment?: string | null;
+  pain_index?: number | null;
+  purchase_power_index?: number | null;
+}): string {
+  const normalized = normalizeProductCode(customer.recommended_product);
+  const segment = customer.ceragem_segment ?? "";
+  const painAxis = /pain/i.test(segment) || indexPercent(customer.pain_index) >= 45;
+  const lowPp = (customer.purchase_power_index ?? 1) < 0.34;
+  if (normalized === "Master S4" && painAxis && lowPp) return "Master V5";
+  return normalized;
+}
+
 export function matchesProductFilter(product: string | null | undefined, selected: string): boolean {
   if (!selected) return true;
   const normalized = normalizeProductCode(product);
@@ -48,7 +62,7 @@ export function matchesProductFilter(product: string | null | undefined, selecte
 
 export function filterCustomersByTarget(customers: CustomerRow[], criteria: ExplorerTargetCriteria): CustomerRow[] {
   return customers.filter((c) => {
-    if (!matchesProductFilter(c.recommended_product, criteria.product)) return false;
+    if (!matchesProductFilter(effectiveRecommendedProduct(c), criteria.product)) return false;
     if (criteria.state && c.state !== criteria.state) return false;
     if (indexPercent(c.pain_index) < criteria.painMin) return false;
     if (indexPercent(c.purchase_power_index) < criteria.purchasePowerMin) return false;

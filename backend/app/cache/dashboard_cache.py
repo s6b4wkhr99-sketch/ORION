@@ -11,7 +11,7 @@ from threading import Event, Lock
 from app.config import settings
 
 # Bump after promo policy / coverage logic changes so all dashboard namespaces rebuild.
-DASHBOARD_BUILD_VERSION = "2026-07-conservative-promo-reach-v4"
+DASHBOARD_BUILD_VERSION = "2026-10-v5-s4-pain-market-metro-v7"
 
 _CACHE: dict[str, tuple[float, dict]] = {}
 _LOCK = Lock()

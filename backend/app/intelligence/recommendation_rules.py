@@ -237,6 +237,27 @@ def _apply_priority_market_nudges(product: str, inputs: RecommendationInputs, la
     return product
 
 
+def _apply_confirmed_s4_pain_v5(product: str, inputs: RecommendationInputs) -> str:
+    """Furniture S4 + Pain + accessible V5 is a confirmed FDA V5 recommendation."""
+    from app.intelligence.promo_price_response import (
+        is_confirmed_s4_pain_v5_target,
+        resolve_promo_price_response,
+    )
+    from app.reference.registry import normalize_product_code
+
+    if normalize_product_code(product) != "Master S4":
+        return product
+    response = resolve_promo_price_response(
+        product,
+        purchase_power_category=inputs.purchase_power_category,
+        zip_income_tier=inputs.zip_income_tier,
+        ceragem_segment=inputs.ceragem_segment,
+    )
+    if is_confirmed_s4_pain_v5_target(product, response.outreach_sku, response.direction):
+        return "Master V5"
+    return product
+
+
 def resolve_rule_065_product(
     inputs: RecommendationInputs,
     *,
@@ -307,6 +328,8 @@ def resolve_rule_065_product(
     if apply_sleep:
         sleep_adjustment = adjust_product_for_sleep_deprivation(product, inputs)
         product = sleep_adjustment["adjusted_product"]
+
+    product = _apply_confirmed_s4_pain_v5(product, inputs)
 
     return {
         "recommended_product": product,

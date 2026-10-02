@@ -385,6 +385,181 @@ def build_city_rollups_for_upload(db: Session, upload_id: uuid.UUID | str) -> in
     return added
 
 
+PRODUCT_FIT_ROLLUP_DIMENSIONS = ("product", "pp_band_prod", "ceragem_prod", "city_prod", "metro")
+
+
+def _upload_ids_with_customers(db: Session, upload_id: uuid.UUID | str | None = None) -> list[uuid.UUID]:
+    if upload_id is not None:
+        return [_as_upload_uuid(upload_id)]
+    return [
+        uid
+        for (uid,) in db.query(Customer.upload_id)
+        .filter(Customer.upload_id.isnot(None))
+        .distinct()
+        .all()
+        if uid
+    ]
+
+
+def _replace_product_ceragem_pp_rollups(db: Session, uid: uuid.UUID) -> int:
+    db.query(UploadRollup).filter(
+        UploadRollup.upload_id == uid,
+        UploadRollup.dimension.in_(("product", "pp_band_prod", "ceragem_prod")),
+    ).delete(synchronize_session=False)
+    rows_added = 0
+
+    grouped = (
+        db.query(
+            Customer.state,
+            CustomerIntelligence.recommended_product,
+            func.count(Customer.customer_id),
+            func.sum(CustomerIntelligence.expected_conversion),
+            func.sum(CustomerIntelligence.expected_revenue),
+        )
+        .join(CustomerIntelligence, CustomerIntelligence.customer_id == Customer.customer_id)
+        .filter(Customer.upload_id == uid)
+        .group_by(Customer.state, CustomerIntelligence.recommended_product)
+        .all()
+    )
+    for state, key, count, orders, revenue in grouped:
+        db.add(
+            UploadRollup(
+                upload_id=uid,
+                dimension="product",
+                scope=state or "Unknown",
+                key=str(key or "Unknown"),
+                customer_count=int(count or 0),
+                expected_orders=float(orders or 0),
+                expected_revenue=float(revenue or 0),
+            )
+        )
+        rows_added += 1
+
+    band_case = _income_band_case()
+    pp_product_stats = (
+        db.query(
+            band_case.label("band"),
+            CustomerIntelligence.recommended_product,
+            func.count(Customer.customer_id),
+            func.sum(CustomerIntelligence.expected_revenue),
+        )
+        .join(CustomerIntelligence, CustomerIntelligence.customer_id == Customer.customer_id)
+        .filter(
+            Customer.upload_id == uid,
+            CustomerIntelligence.recommended_product.isnot(None),
+        )
+        .group_by(band_case, CustomerIntelligence.recommended_product)
+        .all()
+    )
+    for band, product, count, revenue in pp_product_stats:
+        db.add(
+            UploadRollup(
+                upload_id=uid,
+                dimension="pp_band_prod",
+                scope="*",
+                key=f"{str(band or '<$50K')}{ROLLUP_KEY_SEP}{str(product or 'Unknown')}",
+                customer_count=int(count or 0),
+                expected_orders=0.0,
+                expected_revenue=float(revenue or 0),
+            )
+        )
+        rows_added += 1
+
+    ceragem_product_stats = (
+        db.query(
+            CustomerIntelligence.ceragem_segment,
+            CustomerIntelligence.recommended_product,
+            func.count(Customer.customer_id),
+            func.sum(CustomerIntelligence.expected_revenue),
+        )
+        .join(CustomerIntelligence, CustomerIntelligence.customer_id == Customer.customer_id)
+        .filter(
+            Customer.upload_id == uid,
+            CustomerIntelligence.ceragem_segment.isnot(None),
+            CustomerIntelligence.recommended_product.isnot(None),
+        )
+        .group_by(CustomerIntelligence.ceragem_segment, CustomerIntelligence.recommended_product)
+        .all()
+    )
+    for segment, product, count, revenue in ceragem_product_stats:
+        db.add(
+            UploadRollup(
+                upload_id=uid,
+                dimension="ceragem_prod",
+                scope="*",
+                key=f"{str(segment or 'Unknown')}{ROLLUP_KEY_SEP}{str(product or 'Unknown')}",
+                customer_count=int(count or 0),
+                expected_orders=0.0,
+                expected_revenue=float(revenue or 0),
+            )
+        )
+        rows_added += 1
+    return rows_added
+
+
+def _refresh_zip_recommended_products(db: Session, uid: uuid.UUID) -> int:
+    """Set ZIP rollup top product to the current majority recommended SKU."""
+    rows = (
+        db.query(
+            Customer.state,
+            Customer.zip,
+            CustomerIntelligence.recommended_product,
+            func.count(Customer.customer_id),
+        )
+        .join(CustomerIntelligence, CustomerIntelligence.customer_id == Customer.customer_id)
+        .filter(
+            Customer.upload_id == uid,
+            CustomerIntelligence.recommended_product.isnot(None),
+        )
+        .group_by(Customer.state, Customer.zip, CustomerIntelligence.recommended_product)
+        .all()
+    )
+    winners: dict[tuple[str, str], tuple[str, int]] = {}
+    for state, zip_code, product, count in rows:
+        key = (state or "Unknown", zip_code or "Unknown")
+        current = winners.get(key)
+        customers = int(count or 0)
+        if current is None or customers > current[1]:
+            winners[key] = (str(product), customers)
+
+    updated = 0
+    zip_rows = (
+        db.query(UploadRollup)
+        .filter(UploadRollup.upload_id == uid, UploadRollup.dimension == "zip")
+        .all()
+    )
+    for row in zip_rows:
+        winner = winners.get((row.scope or "Unknown", row.key or "Unknown"))
+        if not winner:
+            continue
+        payload = {}
+        if row.payload_json:
+            try:
+                payload = json.loads(row.payload_json) or {}
+            except json.JSONDecodeError:
+                payload = {}
+        if payload.get("recommended_product") == winner[0]:
+            continue
+        payload["recommended_product"] = winner[0]
+        row.payload_json = json.dumps(payload)
+        updated += 1
+    return updated
+
+
+def rebuild_product_fit_rollups(db: Session, upload_id: uuid.UUID | str | None = None) -> int:
+    """Rebuild product-dependent rollups from live recommended_product (Market / Metro)."""
+    from app.market.market_intelligence import build_metro_rollups_for_upload
+
+    added = 0
+    for uid in _upload_ids_with_customers(db, upload_id):
+        added += _replace_product_ceragem_pp_rollups(db, uid)
+        added += build_city_rollups_for_upload(db, uid)
+        added += _refresh_zip_recommended_products(db, uid)
+        added += build_metro_rollups_for_upload(db, uid)
+    db.commit()
+    return added
+
+
 def has_distribution_rollups(db: Session, upload_id: uuid.UUID | str | None = None) -> bool:
     q = db.query(UploadRollup.id).filter(UploadRollup.dimension == "ceragem_prod")
     if upload_id is not None:

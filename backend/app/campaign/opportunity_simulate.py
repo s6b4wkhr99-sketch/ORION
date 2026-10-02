@@ -11,6 +11,11 @@ import uuid
 from sqlalchemy import case, func, literal, or_
 from sqlalchemy.orm import Session
 
+from app.campaign.sku_audience import (
+    CAMPAIGN_SKU_FILTER_VERSION,
+    apply_campaign_skus,
+    confirmed_s4_pain_v5_clause,
+)
 from app.config import settings
 from app.intelligence.ceragem_rules import parse_ceragem_tier
 from app.intelligence.prizm_rules import PRIZM_SEGMENTS as PRIZM_SEGMENT_CODES
@@ -62,9 +67,7 @@ def _base_query(db: Session, upload_id: str | None):
 
 
 def _apply_skus(q, skus: list[str]):
-    if not skus:
-        return q
-    return q.filter(CustomerIntelligence.recommended_product.in_(skus))
+    return apply_campaign_skus(q, skus)
 
 
 def _apply_states(q, states: list[str] | None):
@@ -311,6 +314,7 @@ def _simulate_cache_key(
     segment_filters: dict | None,
 ) -> str:
     payload = {
+        "version": CAMPAIGN_SKU_FILTER_VERSION,
         "upload_id": upload_id,
         "main_sku": main_sku,
         "additional_skus": sorted(additional_skus or []),
@@ -344,13 +348,17 @@ def _run_simulation(
     phase1 = _apply_states(db_scope, states)
     phase2 = _apply_segment_filters(phase1, segment_filters)
 
+    display_product = case(
+        (confirmed_s4_pain_v5_clause(), literal("Master V5")),
+        else_=CustomerIntelligence.recommended_product,
+    )
     by_sku = (
         db_scope.with_entities(
-            CustomerIntelligence.recommended_product,
+            display_product,
             func.count(Customer.customer_id),
             func.coalesce(func.sum(CustomerIntelligence.expected_revenue), 0.0),
         )
-        .group_by(CustomerIntelligence.recommended_product)
+        .group_by(display_product)
         .all()
     )
 

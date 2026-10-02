@@ -250,3 +250,51 @@ def test_simulate_purchase_power_segment_filter(db):
     assert result["phase2"]["kpis"]["customers"] == 1
     assert "High" in result["phase2"]["segment_distributions"]["purchase_power"]
     assert result["phase2"]["segment_distributions"]["purchase_power"]["Low"] == 1
+
+
+def test_simulate_v5_includes_s4_pain_low_pp_targets(db):
+    session, created = db
+    upload = _seed_bundle(session, created)
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V5",
+        ceragem="Low+ · Pain Index",
+        prizm="Caregiving Households",
+        lifestyle=0.4,
+        pain=0.7,
+        brand=0.4,
+        purchase_power=0.25,
+    )
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master S4",
+        ceragem="Low+ · Pain Index",
+        prizm="Caregiving Households",
+        lifestyle=0.4,
+        pain=0.7,
+        brand=0.4,
+        purchase_power=0.25,
+    )
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master S4",
+        ceragem="Low+ · Wellness",
+        prizm="Simple Life",
+        lifestyle=0.4,
+        pain=0.2,
+        brand=0.4,
+        purchase_power=0.25,
+    )
+
+    v5 = simulate_email_campaign_opportunity(session, str(upload.upload_id), main_sku="Master V5")
+    s4 = simulate_email_campaign_opportunity(session, str(upload.upload_id), main_sku="Master S4")
+
+    assert v5["db_potential"]["customers"] == 2
+    assert {row["product"] for row in v5["by_sku"]} == {"Master V5"}
+    assert s4["db_potential"]["customers"] == 1

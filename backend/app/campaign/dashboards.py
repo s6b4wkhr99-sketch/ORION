@@ -685,7 +685,9 @@ def _customer_query(
     if zip_code:
         q = q.filter(Customer.zip == zip_code)
     if product:
-        q = q.filter(CustomerIntelligence.recommended_product == product)
+        from app.campaign.sku_audience import apply_campaign_skus
+
+        q = apply_campaign_skus(q, [product])
     return q
 
 

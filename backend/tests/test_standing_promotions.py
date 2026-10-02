@@ -338,6 +338,58 @@ def test_promotion_coverage_conservative_unassigned_row():
     assert unassigned["kpi_basis"] == "conservative_unassigned"
 
 
+def test_s4_pain_low_pp_is_confirmed_v5_coverage():
+    import app.commercial.summary as summary_mod
+
+    cohort = [
+        {
+            "product": "Master S4",
+            "customers": 123_960,
+            "purchase_power_category": "Low",
+            "ceragem_segment": "Low+ · Pain Index",
+        },
+        {
+            "product": "Master V5",
+            "customers": 25_556,
+            "purchase_power_category": "Low",
+            "ceragem_segment": "Low+ · Pain Index",
+        },
+        {
+            "product": "Pause M4",
+            "customers": 80_000,
+            "purchase_power_category": "Low",
+            "ceragem_segment": "Low+ · Wellness",
+        },
+    ]
+    original_loader = summary_mod.load_promo_coverage_cohort_rows
+    summary_mod.load_promo_coverage_cohort_rows = lambda db, upload_id: cohort
+    try:
+        summary = build_commercial_intelligence_summary(
+            db=_mock_db(),
+            upload_id=None,
+            product_rows=[
+                {"product": "Master S4", "customers": 123_960, "revenue": 1_000_000, "share_pct": 50.0},
+                {"product": "Master V5", "customers": 25_556, "revenue": 200_000, "share_pct": 10.0},
+            ],
+            expected_revenue=0.0,
+            expected_orders=0.0,
+            le_frame_incentive=0.0,
+            targetable_customers=229_516,
+        )
+    finally:
+        summary_mod.load_promo_coverage_cohort_rows = original_loader
+
+    coverage = {row["product"]: row for row in summary["promotion_coverage"] if row.get("product")}
+    unassigned = next((row for row in summary["promotion_coverage"] if not row.get("product")), None)
+    assert coverage["Master V5"]["customers"] == 149_516
+    assert coverage["Master V5"]["direct"] == 25_556
+    assert coverage["Master V5"]["up_convert"] == 123_960
+    assert coverage["Master V5"]["provisional_customers"] in {0, None}
+    assert unassigned is not None
+    assert unassigned["customers"] == 80_000
+    assert (unassigned.get("product_fit") or {}).get("v5_from_s4_pain") in {0, None}
+
+
 def test_promotion_coverage_live_snapshot_endpoint_shape():
     import app.commercial.summary as summary_mod
 
@@ -365,7 +417,7 @@ def test_promotion_coverage_live_snapshot_endpoint_shape():
         summary_mod.load_promo_coverage_cohort_rows = original_loader
         summary_mod._intelligence_customer_count = original_count
 
-    assert snapshot["promotion_coverage_version"] == "conservative-v1"
+    assert snapshot["promotion_coverage_version"] == "conservative-v3-v5-confirmed"
     coverage = {row["product"]: row for row in snapshot["promotion_coverage"] if row.get("product")}
     unassigned = next(row for row in snapshot["promotion_coverage"] if not row.get("product"))
     assert coverage["Pause M10"]["segment_in"] == 50_000

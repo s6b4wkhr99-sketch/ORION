@@ -4,8 +4,9 @@ Use this module when reasoning about how standing promotions change the consumer
 price and which promo SKU a cohort can realistically reach (up-convert, down-convert,
 or keep). Promotion Coverage uses **conservative reach** per SKU: direct + segment-in
 (M10) + ↑/↓ only when the primary SKU is not post-promo accessible (afford-own gate).
-Cohorts that afford their own tier are tracked as unassigned. Opportunity Radar is
-unchanged. See ``aggregate_conservative_promo_coverage``.
+Exception: furniture S4 + Pain up-convert to FDA Class II V5 is **confirmed** V5
+reach even when S4 is affordable. Other afford-own cohorts stay unassigned.
+Opportunity Radar is unchanged. See ``aggregate_conservative_promo_coverage``.
 """
 
 from __future__ import annotations
@@ -327,6 +328,20 @@ def eligible_m10_segment_coverage(
     return False
 
 
+def is_confirmed_s4_pain_v5_target(
+    primary: str,
+    outreach: str,
+    direction: PromoPriceDirection | str,
+) -> bool:
+    """Furniture S4 + Pain → FDA V5 is a confirmed campaign target, not a provisional overlay."""
+    direction_value = direction.value if isinstance(direction, PromoPriceDirection) else str(direction)
+    return (
+        normalize_product_code(primary) == "Master S4"
+        and normalize_product_code(outreach) == "Master V5"
+        and direction_value == PromoPriceDirection.UP.value
+    )
+
+
 def aggregate_conservative_promo_coverage(
     cohort_rows: list[dict],
 ) -> tuple[dict[str, dict[str, int | float]], dict[str, int]]:
@@ -336,6 +351,7 @@ def aggregate_conservative_promo_coverage(
     - Pause M10: segment-in (S) for wellness-premium V9/V7 (+ pause-map donors) when accessible.
     - Other standing promos: direct keep, or ↑/↓ only when the primary SKU is not post-promo
       accessible (afford-own gate).
+    - Confirmed exception: S4 Pain up-convert to V5 counts as V5 reach even if S4 is affordable.
     - Remaining cohorts (afford own tier, unreachable, non-standing outreach) → unassigned.
     """
     standing = set(standing_promo_product_order())
@@ -388,13 +404,14 @@ def aggregate_conservative_promo_coverage(
                 purchase_power_category=pp,
                 zip_income_tier=zip_tier,
             ):
-                unassigned["customers"] += customers
-                unassigned["afford_own"] += customers
-                if outreach == "Master V5" and primary == "Master S4":
-                    product_fit["v5_from_s4_pain"] += customers
-                elif outreach == "Master S4":
-                    product_fit["s4_furniture_unassigned"] += customers
-                continue
+                if is_confirmed_s4_pain_v5_target(primary, outreach, response.direction):
+                    pass
+                else:
+                    unassigned["customers"] += customers
+                    unassigned["afford_own"] += customers
+                    if outreach == "Master S4":
+                        product_fit["s4_furniture_unassigned"] += customers
+                    continue
 
         if response.direction == PromoPriceDirection.UNREACHABLE or outreach not in standing:
             unassigned["customers"] += customers
@@ -424,6 +441,54 @@ def aggregate_conservative_promo_coverage(
         }
     unassigned["product_fit"] = product_fit
     return result, unassigned
+
+
+def rematch_product_rows_confirmed_s4_pain_v5(
+    product_rows: list[dict],
+    cohort_rows: list[dict],
+) -> list[dict]:
+    """Shift confirmed S4 Pain → V5 customers for Highest Opportunity catalog counts."""
+    moved = 0
+    for row in cohort_rows:
+        primary = normalize_product_code(str(row.get("product") or ""))
+        customers = int(row.get("customers") or 0)
+        if not primary or customers <= 0:
+            continue
+        pp = row.get("purchase_power_category")
+        zip_tier = row.get("zip_income_tier")
+        response = resolve_promo_price_response(
+            primary,
+            purchase_power_category=pp,
+            zip_income_tier=zip_tier,
+            ceragem_segment=row.get("ceragem_segment"),
+        )
+        if not is_confirmed_s4_pain_v5_target(primary, response.outreach_sku, response.direction):
+            continue
+        if is_post_promo_accessible(primary, purchase_power_category=pp, zip_income_tier=zip_tier):
+            moved += customers
+    if moved <= 0:
+        return product_rows
+
+    rematched = [dict(row) for row in product_rows]
+    by_product = {str(row.get("product") or ""): row for row in rematched}
+    s4 = by_product.get("Master S4")
+    s4_customers = int(s4.get("customers") or 0) if s4 else 0
+    take = min(moved, s4_customers) if s4 else moved
+    moved_revenue = 0.0
+    if s4 and take:
+        s4_revenue = float(s4.get("revenue") or 0)
+        moved_revenue = round(s4_revenue * take / s4_customers, 2) if s4_customers else 0.0
+        s4["customers"] = s4_customers - take
+        s4["revenue"] = round(s4_revenue - moved_revenue, 2)
+    v5 = by_product.get("Master V5")
+    if v5:
+        v5["customers"] = int(v5.get("customers") or 0) + take
+        v5["revenue"] = round(float(v5.get("revenue") or 0) + moved_revenue, 2)
+    else:
+        rematched.append(
+            {"product": "Master V5", "customers": take, "revenue": moved_revenue, "share_pct": 0.0}
+        )
+    return rematched
 
 
 def aggregate_hybrid_promo_coverage(

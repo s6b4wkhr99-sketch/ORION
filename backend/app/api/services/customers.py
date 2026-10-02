@@ -90,7 +90,9 @@ def _apply_customer_filters(
     if segment:
         q = q.filter(CustomerIntelligence.prizm_proxy_segment == segment)
     if product:
-        q = q.filter(CustomerIntelligence.recommended_product == product)
+        from app.campaign.sku_audience import apply_campaign_skus
+
+        q = apply_campaign_skus(q, [product])
     if purchase_power:
         q = q.filter(_index_level_filter(CustomerIntelligence.purchase_power_index, purchase_power))
     if pain_index:

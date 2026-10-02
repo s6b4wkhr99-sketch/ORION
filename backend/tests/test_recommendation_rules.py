@@ -81,8 +81,8 @@ def test_pain_high_lower_zip_uses_ceragem_pain_ladder():
 
 def test_pain_high_lifestyle_low_steps_further():
     result = rule_065_product_recommendation(_inputs(lifestyle_category="Low"))
-    # Ladder → Pause M4; SKU migration pain-path → Master S4
-    assert result["recommended_product"] == "Master S4"
+    # Ladder / migration may land on S4; Pain + Low PP + V5 promo is confirmed V5.
+    assert result["recommended_product"] == "Master V5"
 
 
 def test_caregiving_wellness_recommends_master_s4():

@@ -29,7 +29,9 @@ def _apply_export_filters(q, *, upload_id, state_filter, zip_filter, segment_fil
     if segment_filter:
         q = q.filter(CustomerIntelligence.prizm_proxy_segment == segment_filter)
     if product_filter:
-        q = q.filter(CustomerIntelligence.recommended_product == product_filter)
+        from app.campaign.sku_audience import apply_campaign_skus
+
+        q = apply_campaign_skus(q, [product_filter])
     if message_direction_filter:
         q = q.filter(CustomerIntelligence.message_direction == message_direction_filter)
     return q

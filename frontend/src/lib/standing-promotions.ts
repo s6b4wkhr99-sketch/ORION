@@ -8,7 +8,16 @@ export const STANDING_PROMOTION_ORDER = [
 ] as const;
 
 /** Bump when Promotion Coverage KPI logic changes — used in executive cache keys + stale detection. */
-export const PROMOTION_COVERAGE_CACHE_VERSION = "conservative-v1";
+export const PROMOTION_COVERAGE_CACHE_VERSION = "conservative-v3-v5-confirmed";
+
+export function productFamilyLabel(product: string | null | undefined): string | null {
+  const code = (product ?? "").trim();
+  if (!code) return null;
+  if (code.startsWith("Master V") && code !== "Master V4") return "FDA Class II";
+  if (code === "Master S4" || code === "Pause S4" || code === "Master V4") return "Furniture · Class I";
+  if (code.startsWith("Pause M")) return "Massage / Sleep";
+  return null;
+}
 
 const STANDING_PROMOTION_SET = new Set<string>(STANDING_PROMOTION_ORDER);
 

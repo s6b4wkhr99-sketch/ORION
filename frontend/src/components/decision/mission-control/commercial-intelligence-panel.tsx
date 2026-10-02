@@ -6,6 +6,7 @@ import { api, type CommercialIntelligenceSummary } from "@/lib/api";
 import {
   normalizeActivePromotions,
   normalizePromotionCoverage,
+  productFamilyLabel,
   PROMOTION_COVERAGE_CACHE_VERSION,
   resolveBestStandingPromoSku,
   type PromotionCoverageRow,
@@ -80,6 +81,7 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
   const [coverage, setCoverage] = useState<PromotionCoverageRow[]>(() =>
     normalizePromotionCoverage(data.promotion_coverage ?? []),
   );
+  const [coverageLoading, setCoverageLoading] = useState(true);
   const [coverageError, setCoverageError] = useState<string | null>(null);
   const promoCodes = uniquePromoCodes([
     ...promos.map((row) => row.promo_code),
@@ -89,6 +91,7 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
   useEffect(() => {
     let cancelled = false;
     setCoverageError(null);
+    setCoverageLoading(true);
 
     api
       .getPromotionCoverage(uploadId ?? undefined)
@@ -104,6 +107,9 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
         if (cancelled) return;
         setCoverageError(error instanceof Error ? error.message : "Failed to load promotion coverage");
         setCoverage(normalizePromotionCoverage(data.promotion_coverage ?? []));
+      })
+      .finally(() => {
+        if (!cancelled) setCoverageLoading(false);
       });
 
     return () => {
@@ -183,18 +189,27 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
       <WidgetShell
         fill
         title="Promotion Coverage"
-        subtitle="Conservative reach · product-fit provisional is separate"
+        subtitle="Conservative reach · S4 Pain → V5 is confirmed"
       >
         <div className="flex h-full min-h-0 flex-col gap-5">
           {coverageError ? (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">{coverageError}</p>
+          ) : null}
+          {coverageLoading ? (
+            <p className="text-[11px] text-[var(--cios-secondary)]">Updating promotion coverage…</p>
           ) : null}
           {(coverage.length ? coverage : [{ promo_code: "—", customers: 0, coverage_pct: 0, product: null }]).map((row) => {
             const convertParts: string[] = [];
             if ((row.direct ?? 0) > 0 && (row.direct ?? 0) !== row.customers) {
               convertParts.push(`${formatNumber(row.direct ?? 0)} direct`);
             }
-            if ((row.up_convert ?? 0) > 0) convertParts.push(`↑${formatNumber(row.up_convert ?? 0)} up`);
+            if ((row.up_convert ?? 0) > 0) {
+              convertParts.push(
+                row.product === "Master V5"
+                  ? `↑${formatNumber(row.up_convert ?? 0)} S4 Pain → V5`
+                  : `↑${formatNumber(row.up_convert ?? 0)} up`,
+              );
+            }
             if ((row.down_convert ?? 0) > 0) convertParts.push(`↓${formatNumber(row.down_convert ?? 0)} down`);
             if ((row.segment_in ?? 0) > 0) convertParts.push(`◎${formatNumber(row.segment_in ?? 0)} segment`);
             if ((row.afford_own ?? 0) > 0) {
@@ -204,22 +219,20 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
               convertParts.push(`${formatNumber(row.unreachable ?? 0)} unreachable`);
             }
             if ((row.provisional_customers ?? 0) > 0) {
-              convertParts.push(`+${formatNumber(row.provisional_customers ?? 0)} product-fit provisional`);
-            }
-            if (row.product_fit?.v5_from_s4_pain) {
-              convertParts.push(`${formatNumber(row.product_fit.v5_from_s4_pain)} S4 Pain → V5 provisional`);
+              convertParts.push(`+${formatNumber(row.provisional_customers ?? 0)} furniture outreach`);
             }
             if (row.product_fit?.s4_furniture_unassigned) {
               convertParts.push(`${formatNumber(row.product_fit.s4_furniture_unassigned)} furniture outreach`);
             }
             const familyLabel =
-              row.product_family === "fda_class_2"
+              productFamilyLabel(row.product) ??
+              (row.product_family === "fda_class_2"
                 ? "FDA Class II"
                 : row.product_family === "furniture_design"
                   ? "Furniture · Class I"
                   : row.product_family === "massage_sleep"
                     ? "Massage / Sleep"
-                    : null;
+                    : null);
             const isUnassigned = !row.product;
             return (
               <div key={row.product ?? "unassigned"} className="space-y-1">
