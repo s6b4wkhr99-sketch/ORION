@@ -1,15 +1,7 @@
 import { expect, Page, test } from "@playwright/test";
+import { ADMIN, login } from "./helpers";
 
-const ADMIN = { email: "user@company.com", password: "Ceragem2026!Adm" };
 const READONLY = { email: "readonly@company.com", password: "Ceragem2026!Ro" };
-
-export async function login(page: Page, email: string, password: string, next = "/mission-control") {
-  await page.goto(`/login?next=${encodeURIComponent(next)}`);
-  await page.locator("#email").fill(email);
-  await page.locator("#password").fill(password);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL(`**${next}**`, { timeout: 30_000 });
-}
 
 test.describe("Auth smoke", () => {
   test("admin login reaches Mission Control", async ({ page }) => {

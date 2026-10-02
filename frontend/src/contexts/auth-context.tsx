@@ -56,6 +56,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const freshSignIn = params.get("fresh") === "1" && window.location.pathname === "/login";
+      if (freshSignIn) {
+        api.clearSession();
+        setSession(null);
+        setLoading(false);
+        setRefreshing(false);
+        params.delete("fresh");
+        const next = params.toString();
+        window.history.replaceState({}, "", next ? `/login?${next}` : "/login");
+        return () => {
+          cancelled = true;
+        };
+      }
+    }
+
     if (api.hasStoredToken()) {
       const stored = api.readStoredSession();
       if (stored) {

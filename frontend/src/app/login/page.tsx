@@ -5,12 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { LOGIN_MOTION_HEIGHT, LoginBrandMotion } from "@/components/auth/login-brand-motion";
 import { SiteFooter } from "@/components/layout/site-footer";
+import { AUTH_REQUIRED } from "@/lib/access-control";
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, session, loading } = useAuth();
-  const [email, setEmail] = useState("user@company.com");
+  const [email, setEmail] = useState(AUTH_REQUIRED ? "" : "user@company.com");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);

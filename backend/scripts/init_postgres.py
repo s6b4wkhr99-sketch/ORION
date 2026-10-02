@@ -65,7 +65,8 @@ def main() -> int:
     db = SessionLocal()
     try:
         seed_configuration(db)
-        seed_users(db)
+        if settings.seed_dev_users:
+            seed_users(db)
         seed_v16_reference_schema(db)
     finally:
         db.close()

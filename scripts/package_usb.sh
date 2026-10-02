@@ -113,6 +113,7 @@ cp "$ROOT/docs/Other_Mac_Operations_Guide.md" "$USB_ROOT/docs/"
 cp "$ROOT/docs/Local_Disk_Cleanup_Guide.md" "$USB_ROOT/docs/"
 cp "$ROOT/packaging/usb-docs/START-HERE-INSTALL-OPTIONS.txt" "$USB_ROOT/START-HERE-INSTALL-OPTIONS.txt"
 cp "$ROOT/packaging/usb-docs/OTHER-MAC-VERIFY.txt" "$USB_ROOT/OTHER-MAC-VERIFY.txt"
+cp "$ROOT/docs/Other_Mac_Install_Runbook.md" "$USB_ROOT/INSTALL-RUNBOOK.md"
 
 echo "==> Copying canvas..."
 if [ -d "$PREV_USB/canvas" ]; then
@@ -314,6 +315,9 @@ EOF
 
 chmod +x "$USB_ROOT/source/scripts/dev_daemon.sh" 2>/dev/null || true
 chmod +x "$USB_ROOT/source/Start CIOS.command" 2>/dev/null || true
+chmod +x "$USB_ROOT/source/Start CIOS (Sign In).command" 2>/dev/null || true
+chmod +x "$USB_ROOT/source/scripts/start_field_mac.sh" 2>/dev/null || true
+chmod +x "$USB_ROOT/source/scripts/setup_field_mac.sh" 2>/dev/null || true
 
 echo ""
 echo "✓ USB package ready: $USB_ROOT"

@@ -1,4 +1,4 @@
-ORION v1.5.0 — Other Mac install verify (after Option A or B)
+ORION v1.5.1 — Other Mac install verify (after Option A or B)
 ==============================================================
 
 Primary install steps: INSTALL-RUNBOOK.md  (or docs/Other_Mac_Install_Runbook.md)

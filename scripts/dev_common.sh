@@ -141,3 +141,27 @@ warn_upload_worker() {
       ;;
   esac
 }
+
+# Other Mac / field deployment: require manual sign-in (no dev admin auto-session).
+is_field_mac() {
+  if [ "${CIOS_FIELD_MAC:-0}" = "1" ] || [ "${CIOS_FIELD_LAUNCH:-0}" = "1" ]; then
+    return 0
+  fi
+  if [ -f "${DEV_COMMON_ROOT}/.cios-field-mac" ]; then
+    return 0
+  fi
+  local seed_dev
+  seed_dev="$(read_backend_env SEED_DEV_USERS true | tr '[:upper:]' '[:lower:]')"
+  case "$seed_dev" in
+    false|0|no) return 0 ;;
+  esac
+  return 1
+}
+
+field_mac_login_url() {
+  if is_field_mac; then
+    echo "http://127.0.0.1:3002/login?fresh=1"
+  else
+    echo "http://127.0.0.1:3002/login"
+  fi
+}

@@ -90,7 +90,8 @@ def on_startup():
             from app.schema.seed_v16 import seed_v16_reference_schema
 
             seed_configuration(db)
-            seed_users(db)
+            if settings.seed_dev_users:
+                seed_users(db)
             seed_v16_reference_schema(db)
         from app.commercial.catalog import warm_catalog_cache
         from app.campaign.executive_dashboard import get_executive_summary

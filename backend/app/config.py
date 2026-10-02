@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     # Startup / local native performance
     skip_physical_schema: bool = False
     skip_startup_seed: bool = False
+    # When false, do not create default dev accounts (user@company.com, etc.) on startup.
+    seed_dev_users: bool = True
     opportunity_simulate_cache_enabled: bool = False
     opportunity_simulate_cache_ttl_seconds: int = 300
 
