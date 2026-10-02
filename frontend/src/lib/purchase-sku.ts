@@ -16,7 +16,8 @@ export const PURCHASE_SKU_TO_PRODUCT: Record<string, string> = {
   M10: "Pause M10",
 };
 
-const V_SERIES_SKUS = new Set(["V9", "V7", "V6", "V5", "V4", "S4"]);
+const V_SERIES_SKUS = new Set(["V9", "V7", "V6", "V5"]);
+const S_SERIES_SKUS = new Set(["S4", "V4"]);
 
 export function purchaseSkuColor(sku: string | null | undefined): string {
   if (!sku) return productColor(null);
@@ -35,6 +36,10 @@ export function purchaseSkuLegendOrder(skus: Iterable<string>): string[] {
 
 export function purchaseSkuBelongsToVSeries(sku: string): boolean {
   return V_SERIES_SKUS.has(sku.toUpperCase());
+}
+
+export function purchaseSkuBelongsToSSeries(sku: string): boolean {
+  return S_SERIES_SKUS.has(sku.toUpperCase());
 }
 
 /** User-facing legend / tooltip label from actual purchase SKU token. */

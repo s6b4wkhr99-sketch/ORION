@@ -13,7 +13,8 @@ export type ExplorerTargetCriteria = {
 export const EXPLORER_GOALS = ["Revenue", "Conversion", "Acquisition", "Premium Product", "Clinical Product"] as const;
 
 export const PRODUCT_SERIES = {
-  v: ["Master V9", "Master V7", "Master V6", "Master V5", "Master S4"],
+  v: ["Master V9", "Master V7", "Master V6", "Master V5"],
+  s: ["Master S4"],
   m: ["Pause M10", "Pause M6", "Pause M6s", "Pause M4"],
 } as const;
 
@@ -35,6 +36,9 @@ export function matchesProductFilter(product: string | null | undefined, selecte
   const normalized = normalizeProductCode(product);
   if (selected === "V Series") {
     return PRODUCT_SERIES.v.includes(normalized as (typeof PRODUCT_SERIES.v)[number]);
+  }
+  if (selected === "S Series") {
+    return PRODUCT_SERIES.s.includes(normalized as (typeof PRODUCT_SERIES.s)[number]);
   }
   if (selected === "M Series") {
     return PRODUCT_SERIES.m.includes(normalized as (typeof PRODUCT_SERIES.m)[number]);
@@ -64,8 +68,11 @@ export function sortCustomersByGoal(customers: CustomerRow[], goal: string): Cus
 
 export function deriveCampaignMessage(criteria: ExplorerTargetCriteria): string {
   const product = criteria.product;
-  if (product === "V Series" || product.startsWith("Master V") || product === "Master S4" || criteria.goal === "Clinical Product" || criteria.painMin >= 55) {
+  if (product === "V Series" || (product.startsWith("Master V") && product !== "Master V4") || criteria.goal === "Clinical Product" || criteria.painMin >= 55) {
     return "Pain Relief + Therapeutic Value Message";
+  }
+  if (product === "S Series" || product === "Master S4") {
+    return "Wellness Education + Value Message";
   }
   if (product === "M Series" || product.startsWith("Pause M") || criteria.lifestyleMin >= 55) {
     return "Sleep Restoration + Wellness Message";
@@ -80,7 +87,7 @@ export function deriveCampaignMessage(criteria: ExplorerTargetCriteria): string 
 }
 
 export function deriveRecommendedProduct(criteria: ExplorerTargetCriteria, matched: CustomerRow[]): string {
-  if (criteria.product && criteria.product !== "V Series" && criteria.product !== "M Series") {
+  if (criteria.product && criteria.product !== "V Series" && criteria.product !== "S Series" && criteria.product !== "M Series") {
     return normalizeProductCode(criteria.product);
   }
   if (matched.length) {
@@ -108,4 +115,4 @@ export function resolveOpportunityScore(
   );
 }
 
-export const EXPLORER_PRODUCT_CHOICES = ["", "V Series", "M Series", ...PRODUCT_OPTIONS] as const;
+export const EXPLORER_PRODUCT_CHOICES = ["", "V Series", "S Series", "M Series", ...PRODUCT_OPTIONS] as const;

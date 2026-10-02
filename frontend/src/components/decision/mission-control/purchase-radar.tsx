@@ -12,6 +12,7 @@ import {
 } from "@/lib/radar-chart-layout";
 import { radarXDomain, radarYDomain, spreadRadarOpportunityY } from "@/lib/radar-axis-spread";
 import {
+  purchaseSkuBelongsToSSeries,
   purchaseSkuBelongsToVSeries,
   purchaseSkuColor,
   purchaseSkuLegendLabel,
@@ -182,8 +183,9 @@ export function PurchaseRadar({
 
   const { vSeriesLegend, mSeriesLegend } = useMemo(() => {
     const vSeries = legendSkus.filter((sku) => purchaseSkuBelongsToVSeries(sku));
-    const mSeries = legendSkus.filter((sku) => !vSeries.includes(sku));
-    return { vSeriesLegend: vSeries, mSeriesLegend: mSeries };
+    const sSeries = legendSkus.filter((sku) => purchaseSkuBelongsToSSeries(sku));
+    const mSeries = legendSkus.filter((sku) => !vSeries.includes(sku) && !sSeries.includes(sku));
+    return { vSeriesLegend: [...vSeries, ...sSeries], mSeriesLegend: mSeries };
   }, [legendSkus]);
 
   const visiblePoints = useMemo(() => {

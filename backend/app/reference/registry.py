@@ -223,7 +223,9 @@ PRODUCT_CATALOG: list[dict] = [
         "default_promotion_pct": 0.30,
         "promo_code": "SAVE30",
         "le_frame_incentive": 824.85,
-        "segment": "Emerging Wellness",
+        "segment": "Healthterior Design",
+        "fda_class": "I",
+        "fda_status": "registered",
         "order": 5,
         "active": True,
     },
@@ -340,33 +342,65 @@ ACTIVE_STANDING_PROMOTION_ORDER: tuple[str, ...] = (
     "Pause M6s",
 )
 
-# Observed unit sales mix anchor — V Series (FDA Class 2 therapeutic) : M Series (design/sleep).
+# Observed unit sales mix anchor — V Series (FDA Class II therapeutic) : M Series (massage/sleep).
+# Master S4 is furniture / Healthterior (FDA Class I registered only) — not in this V:M mix.
 OBSERVED_V_M_SALES_MIX: tuple[float, float] = (0.65, 0.35)
 
+# ceragemus.com: V5/V6/V7/V9 are FDA Class II 510(k) cleared. S4 is Class I registered only.
 FDA_CLASS_2_PRODUCTS: frozenset[str] = frozenset(
-    {"Master S4", "Master V5", "Master V6", "Master V7", "Master V9"}
+    {"Master V5", "Master V6", "Master V7", "Master V9"}
 )
 
 # Legacy SKU codes retained in historical uploads / intelligence_version snapshots.
-# Legacy names — same physical SKU as Master S4 (formerly marketed as Pause S4).
+# Legacy names — same physical SKU as Master S4 (formerly marketed as Pause S4 / Master V4).
 LEGACY_PRODUCT_ALIASES: dict[str, str] = {
     "Master V4": "Master S4",
     "Pause S4": "Master S4",
 }
 V_SERIES_PRODUCTS: frozenset[str] = FDA_CLASS_2_PRODUCTS
+S_SERIES_PRODUCTS: frozenset[str] = frozenset({"Master S4"})
+FURNITURE_DESIGN_PRODUCTS: frozenset[str] = S_SERIES_PRODUCTS
 M_SERIES_PRODUCTS: frozenset[str] = frozenset(
     {"Pause M4", "Pause M6", "Pause M6s", "Pause M10"}
 )
 
+PRODUCT_FAMILY_FDA_CLASS_2 = "fda_class_2"
+PRODUCT_FAMILY_FURNITURE_DESIGN = "furniture_design"
+PRODUCT_FAMILY_MASSAGE_SLEEP = "massage_sleep"
+PRODUCT_FAMILY_OTHER = "other"
+
 
 def is_fda_class_2(product_code: str) -> bool:
-    return product_code in FDA_CLASS_2_PRODUCTS
+    return normalize_product_code(product_code) in FDA_CLASS_2_PRODUCTS
+
+
+def product_family(product_code: str | None) -> str:
+    code = normalize_product_code(product_code)
+    if code in FDA_CLASS_2_PRODUCTS:
+        return PRODUCT_FAMILY_FDA_CLASS_2
+    if code in FURNITURE_DESIGN_PRODUCTS:
+        return PRODUCT_FAMILY_FURNITURE_DESIGN
+    if code in M_SERIES_PRODUCTS:
+        return PRODUCT_FAMILY_MASSAGE_SLEEP
+    return PRODUCT_FAMILY_OTHER
+
+
+def regulatory_class(product_code: str | None) -> str | None:
+    """Official Ceragem US labeling — Class II 510(k) vs Class I registered vs none."""
+    code = normalize_product_code(product_code)
+    if code in FDA_CLASS_2_PRODUCTS:
+        return "class_ii_510k"
+    if code in FURNITURE_DESIGN_PRODUCTS:
+        return "class_i_registered"
+    return None
 
 
 def product_line(product_code: str) -> str:
     product_code = LEGACY_PRODUCT_ALIASES.get(product_code, product_code)
     if product_code in V_SERIES_PRODUCTS:
         return "V"
+    if product_code in S_SERIES_PRODUCTS:
+        return "S"
     if product_code in M_SERIES_PRODUCTS:
         return "M"
     return "Other"

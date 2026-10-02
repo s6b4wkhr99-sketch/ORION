@@ -23,8 +23,10 @@ PRIORITY_TO_SCORE = {level[0]: level[2] for level in _PRIORITY_SEED}
 _PAUSE_M_RANK = {"Pause M4": 1, "Pause M6": 2, "Pause M6s": 3, "Pause M10": 4}
 _THERAPEUTIC_V_PRODUCTS = FDA_CLASS_2_PRODUCTS
 
-# Accessible value SKUs — preserved from sleep/resistance stripping on wellness paths.
+# Furniture (S4) + value massage — preserved from sleep/resistance stripping on wellness paths.
+# S4 is FDA Class I Healthterior, not Class II therapeutic V.
 _VALUE_MASSAGE_PRODUCTS = {"Master S4", "Pause M6s", "Pause M4"}
+_FURNITURE_DESIGN_PRODUCTS = {"Master S4"}
 
 
 @dataclass
@@ -359,6 +361,11 @@ def adjust_product_for_sleep_deprivation(product: str, inputs: RecommendationInp
         reason = "therapeutic_v_preserved"
     elif segment_axis_is_pain(inputs.ceragem_segment) and product in _THERAPEUTIC_V_PRODUCTS:
         reason = "fda_v_preserved_pain_segment"
+    elif product in _FURNITURE_DESIGN_PRODUCTS and (
+        pain == "High" or segment_axis_is_pain(inputs.ceragem_segment)
+    ):
+        # S4 is furniture, not FDA Class II — still do not sleep-nudge spine profiles into M-series.
+        reason = "furniture_s4_held_on_pain_axis"
     elif product == "Master S4":
         adjusted = "Pause M4" if boost >= 0.14 else product
         reason = "sleep_city_s4_to_m4"

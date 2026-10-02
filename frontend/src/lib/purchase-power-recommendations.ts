@@ -1,6 +1,6 @@
 /** Purchase Power band recommendation helpers — mirrors backend series-mix rules. */
 
-import { M_SERIES_PRODUCTS, V_SERIES_PRODUCTS } from "@/lib/config";
+import { M_SERIES_PRODUCTS, S_SERIES_PRODUCTS, V_SERIES_PRODUCTS } from "@/lib/config";
 
 export const PURCHASE_POWER_BAND_SCORES: Record<string, number> = {
   "$150K+": 85,
@@ -12,8 +12,9 @@ export const PURCHASE_POWER_BAND_SCORES: Record<string, number> = {
 
 import { effectiveProductPrice } from "@/lib/effective-product-price";
 
-function productSeries(product: string): "v" | "m" | "other" {
-  if (product.startsWith("Master V") || product === "Master S4") return "v";
+function productSeries(product: string): "v" | "s" | "m" | "other" {
+  if (product.startsWith("Master V") && product !== "Master V4") return "v";
+  if (product === "Master S4" || product === "Pause S4" || product === "Master V4") return "s";
   if (product.startsWith("Pause M")) return "m";
   return "other";
 }
@@ -37,7 +38,7 @@ function priceAccessibilityFit(product: string, purchasePowerScore: number): num
 }
 
 function sellableForScore(score: number, limit = 12): string[] {
-  const active = [...V_SERIES_PRODUCTS, ...M_SERIES_PRODUCTS];
+  const active = [...V_SERIES_PRODUCTS, ...S_SERIES_PRODUCTS, ...M_SERIES_PRODUCTS];
   return [...active]
     .map((product) => ({ product, fit: priceAccessibilityFit(product, score) }))
     .filter((row) => row.fit > 0)
@@ -85,13 +86,15 @@ export function ensureBandRecommendationProducts(band: string, products: string[
   return result.slice(0, limit);
 }
 
-export function splitBandProductsBySeries(products: string[]): { vSeries: string[]; mSeries: string[] } {
+export function splitBandProductsBySeries(products: string[]): { vSeries: string[]; sSeries: string[]; mSeries: string[] } {
   const vSeries: string[] = [];
+  const sSeries: string[] = [];
   const mSeries: string[] = [];
   for (const product of products) {
     const series = productSeries(product);
     if (series === "v" && !vSeries.includes(product)) vSeries.push(product);
+    if (series === "s" && !sSeries.includes(product)) sSeries.push(product);
     if (series === "m" && !mSeries.includes(product)) mSeries.push(product);
   }
-  return { vSeries, mSeries };
+  return { vSeries, sSeries, mSeries };
 }

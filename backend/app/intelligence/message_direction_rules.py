@@ -96,7 +96,7 @@ def rule_045_pain_relief_value(inputs: MessageInputs) -> tuple[str | None, bool]
 
 
 def rule_046_fda_trust(inputs: MessageInputs) -> tuple[str | None, bool]:
-    """Rule-046: FDA Class 2 V-series trust — key purchase driver vs. commodity massage chairs."""
+    """Rule-046: FDA Class II V-series trust — key purchase driver vs. furniture/massage chairs."""
     if "Pain Index" in inputs.ceragem_segment:
         return "FDA Cleared Technology Trust Message", True
     if inputs.pain_index >= 0.35:

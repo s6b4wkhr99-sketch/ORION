@@ -53,6 +53,14 @@ export type PromotionCoverageRow = {
   unreachable?: number;
   kpi_basis?: string;
   promotion_coverage_version?: string;
+  product_family?: string | null;
+  regulatory_class?: string | null;
+  provisional_customers?: number;
+  provisional_basis?: string | null;
+  product_fit?: {
+    v5_from_s4_pain?: number;
+    s4_furniture_unassigned?: number;
+  };
 };
 
 export function normalizePromotionCoverage(rows: PromotionCoverageRow[]): PromotionCoverageRow[] {
@@ -78,6 +86,10 @@ export function normalizePromotionCoverage(rows: PromotionCoverageRow[]): Promot
       down_convert: (prev.down_convert ?? 0) + (row.down_convert ?? 0),
       segment_in: (prev.segment_in ?? 0) + (row.segment_in ?? 0),
       kpi_basis: prev.kpi_basis || row.kpi_basis,
+      product_family: prev.product_family || row.product_family,
+      regulatory_class: prev.regulatory_class || row.regulatory_class,
+      provisional_customers: (prev.provisional_customers ?? 0) + (row.provisional_customers ?? 0),
+      provisional_basis: prev.provisional_basis || row.provisional_basis,
     });
   }
   const standingRows = STANDING_PROMOTION_ORDER.flatMap((product) => {
@@ -94,6 +106,12 @@ export function normalizePromotionCoverage(rows: PromotionCoverageRow[]): Promot
       coverage_pct: Math.round((acc.coverage_pct + row.coverage_pct) * 10) / 10,
       afford_own: (acc.afford_own ?? 0) + (row.afford_own ?? 0),
       unreachable: (acc.unreachable ?? 0) + (row.unreachable ?? 0),
+      product_fit: {
+        v5_from_s4_pain:
+          (acc.product_fit?.v5_from_s4_pain ?? 0) + (row.product_fit?.v5_from_s4_pain ?? 0),
+        s4_furniture_unassigned:
+          (acc.product_fit?.s4_furniture_unassigned ?? 0) + (row.product_fit?.s4_furniture_unassigned ?? 0),
+      },
     };
   }, null);
   return unassigned ? [...standingRows, unassigned] : standingRows;

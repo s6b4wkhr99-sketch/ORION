@@ -386,14 +386,9 @@ RECENT_OPPORTUNITIES_TARGET_SERIES = ("V", "M", "S")
 
 
 def _product_series_code(product: str | None) -> str:
-    code = (product or "").strip()
-    if code.startswith("Master V"):
-        return "V"
-    if code.startswith("Pause M"):
-        return "M"
-    if code.startswith("Pause S"):
-        return "S"
-    return "Other"
+    from app.reference.registry import product_line
+
+    return product_line(product or "")
 
 
 def _state_purchase_power_geo_by_state(db: Session, upload_id: uuid.UUID | None) -> dict[str, dict[str, float | str]]:

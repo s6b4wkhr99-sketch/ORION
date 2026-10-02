@@ -1,6 +1,6 @@
 /** Ceragem Segmentation+ recommendation helpers — uses explicit product ladders. */
 
-import { M_SERIES_PRODUCTS, V_SERIES_PRODUCTS } from "@/lib/config";
+import { M_SERIES_PRODUCTS, S_SERIES_PRODUCTS, V_SERIES_PRODUCTS } from "@/lib/config";
 import {
   ceragemSegmentSortKey,
   ladderForCeragem,
@@ -48,8 +48,9 @@ export function ceragemSegmentScore(segment: string): number {
   return CERAGEM_TIER_SCORES[tier] ?? 50;
 }
 
-function productSeries(product: string): "v" | "m" | "other" {
-  if (product.startsWith("Master V") || product === "Master S4") return "v";
+function productSeries(product: string): "v" | "s" | "m" | "other" {
+  if (product.startsWith("Master V") && product !== "Master V4") return "v";
+  if (product === "Master S4" || product === "Pause S4" || product === "Master V4") return "s";
   if (product.startsWith("Pause M")) return "m";
   return "other";
 }
@@ -73,7 +74,7 @@ function priceAccessibilityFit(product: string, purchasePowerScore: number): num
 }
 
 function sellableForScore(score: number, limit = 12): string[] {
-  const active = [...V_SERIES_PRODUCTS, ...M_SERIES_PRODUCTS];
+  const active = [...V_SERIES_PRODUCTS, ...S_SERIES_PRODUCTS, ...M_SERIES_PRODUCTS];
   return [...active]
     .map((product) => ({ product, fit: priceAccessibilityFit(product, score) }))
     .filter((row) => row.fit > 0)
@@ -113,13 +114,15 @@ export function ensureSegmentRecommendationProducts(segment: string, products: s
   return result.slice(0, limit);
 }
 
-export function splitSegmentProductsBySeries(products: string[]): { vSeries: string[]; mSeries: string[] } {
+export function splitSegmentProductsBySeries(products: string[]): { vSeries: string[]; sSeries: string[]; mSeries: string[] } {
   const vSeries: string[] = [];
+  const sSeries: string[] = [];
   const mSeries: string[] = [];
   for (const product of products) {
     const series = productSeries(product);
     if (series === "v" && !vSeries.includes(product)) vSeries.push(product);
+    if (series === "s" && !sSeries.includes(product)) sSeries.push(product);
     if (series === "m" && !mSeries.includes(product)) mSeries.push(product);
   }
-  return { vSeries, mSeries };
+  return { vSeries, sSeries, mSeries };
 }

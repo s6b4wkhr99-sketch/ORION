@@ -27,7 +27,12 @@ from app.commercial.promotion_policy import (
     standing_promo_product_order,
 )
 from app.models.customer import Customer, CustomerIntelligence
-from app.reference.registry import COMMERCIAL_VERSION, PRODUCT_CATALOG
+from app.reference.registry import (
+    COMMERCIAL_VERSION,
+    PRODUCT_CATALOG,
+    product_family,
+    regulatory_class,
+)
 
 
 def build_active_promotions() -> list[dict]:
@@ -127,10 +132,11 @@ def _promotion_coverage(
     denominator = max(db_total, 1)
     cohort_rows = load_promo_coverage_cohort_rows(db, upload_id)
     responsive_by_sku: dict[str, dict] = {}
-    unassigned: dict[str, int] = {"customers": 0, "afford_own": 0, "unreachable": 0}
+    unassigned: dict = {"customers": 0, "afford_own": 0, "unreachable": 0}
     if cohort_rows:
         responsive_by_sku, unassigned = aggregate_conservative_promo_coverage(cohort_rows)
     responsive_basis = bool(responsive_by_sku or unassigned.get("customers"))
+    fit = unassigned.get("product_fit") if isinstance(unassigned.get("product_fit"), dict) else {}
 
     coverage: list[dict] = []
     for product_code in standing_promo_product_order():
@@ -146,6 +152,14 @@ def _promotion_coverage(
             kpi_basis = "conservative_promo_reach"
         else:
             kpi_basis = "primary_sku_direct"
+        provisional = 0
+        provisional_basis = None
+        if product_code == "Master V5":
+            provisional = int(fit.get("v5_from_s4_pain") or 0)
+            provisional_basis = "s4_pain_furniture_overlap" if provisional else None
+        elif product_code == "Master S4":
+            provisional = int(fit.get("s4_furniture_unassigned") or 0)
+            provisional_basis = "unassigned_furniture_outreach" if provisional else None
 
         coverage.append(
             {
@@ -160,6 +174,10 @@ def _promotion_coverage(
                 "down_convert": int(responsive.get("down_convert") or 0),
                 "segment_in": int(responsive.get("segment_in") or 0),
                 "kpi_basis": kpi_basis,
+                "product_family": product_family(product_code),
+                "regulatory_class": regulatory_class(product_code),
+                "provisional_customers": provisional,
+                "provisional_basis": provisional_basis,
             }
         )
 
@@ -175,6 +193,10 @@ def _promotion_coverage(
                 "afford_own": int(unassigned.get("afford_own") or 0),
                 "unreachable": int(unassigned.get("unreachable") or 0),
                 "kpi_basis": "conservative_unassigned",
+                "product_fit": {
+                    "v5_from_s4_pain": int(fit.get("v5_from_s4_pain") or 0),
+                    "s4_furniture_unassigned": int(fit.get("s4_furniture_unassigned") or 0),
+                },
             }
         )
 

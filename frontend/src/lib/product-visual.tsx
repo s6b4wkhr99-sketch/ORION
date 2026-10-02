@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { PRODUCT_LEGEND_ORDER, V_SERIES_PRODUCTS } from "@/lib/config";
+import { PRODUCT_LEGEND_ORDER, S_SERIES_PRODUCTS, V_SERIES_PRODUCTS } from "@/lib/config";
 import {
   colorProductForLegend,
   legendEntryHasData,
@@ -75,6 +75,7 @@ export function productLegendOrder(products: Iterable<string>): string[] {
 export function splitProductLegend(_products: string[]) {
   return {
     vSeries: [...V_SERIES_PRODUCTS],
+    sSeries: [...S_SERIES_PRODUCTS],
     mSeries: [...M_SERIES_DISPLAY_LEGEND],
   };
 }
@@ -101,7 +102,7 @@ export function ProductChartLegend({
   headerExtra,
   className,
 }: ProductChartLegendProps) {
-  const { vSeries, mSeries } = splitProductLegend([]);
+  const { vSeries, sSeries, mSeries } = splitProductLegend([]);
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -123,7 +124,7 @@ export function ProductChartLegend({
       </div>
       <div className="flex flex-col gap-0.5">
         <div className="flex flex-wrap gap-2">
-          {vSeries.map((product) => (
+          {[...vSeries, ...sSeries].map((product) => (
             <ProductTargetLegendButton
               key={product}
               product={product}

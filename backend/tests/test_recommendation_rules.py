@@ -372,7 +372,7 @@ def test_v6_capped_without_affluent_zip_when_promo_inactive(monkeypatch):
     assert result["recommended_product"] in {"Master V5", "Pause M6", "Master S4", "Pause M4"}
 
 
-def test_sleep_city_preserves_master_v_for_pain_high():
+def test_sleep_city_holds_furniture_s4_for_pain_high():
     result = adjust_product_for_sleep_deprivation(
         "Master S4",
         _inputs(
@@ -383,10 +383,11 @@ def test_sleep_city_preserves_master_v_for_pain_high():
     )
     assert result["adjusted_product"] == "Master S4"
     assert result["adjusted"] is False
+    assert result["adjustment_reason"] == "furniture_s4_held_on_pain_axis"
 
 
-def test_sleep_still_preserves_master_s4_on_pain_axis():
-    # Master S4 is FDA Class 2 — sleep nudge preserves therapeutic V on pain axis
+def test_sleep_holds_furniture_s4_on_pain_axis():
+    # S4 is furniture (Class I), not FDA Class II — still do not sleep-nudge into M-series.
     result = adjust_product_for_sleep_deprivation(
         "Master S4",
         _inputs(
@@ -398,6 +399,7 @@ def test_sleep_still_preserves_master_s4_on_pain_axis():
     )
     assert result["adjusted_product"] == "Master S4"
     assert result["adjusted"] is False
+    assert result["adjustment_reason"] == "furniture_s4_held_on_pain_axis"
 
 
 if __name__ == "__main__":

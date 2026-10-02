@@ -350,6 +350,7 @@ def aggregate_conservative_promo_coverage(
         }
     )
     unassigned = {"customers": 0, "afford_own": 0, "unreachable": 0}
+    product_fit = {"v5_from_s4_pain": 0, "s4_furniture_unassigned": 0}
 
     for row in cohort_rows:
         primary = normalize_product_code(str(row.get("product") or ""))
@@ -389,6 +390,10 @@ def aggregate_conservative_promo_coverage(
             ):
                 unassigned["customers"] += customers
                 unassigned["afford_own"] += customers
+                if outreach == "Master V5" and primary == "Master S4":
+                    product_fit["v5_from_s4_pain"] += customers
+                elif outreach == "Master S4":
+                    product_fit["s4_furniture_unassigned"] += customers
                 continue
 
         if response.direction == PromoPriceDirection.UNREACHABLE or outreach not in standing:
@@ -417,6 +422,7 @@ def aggregate_conservative_promo_coverage(
             "segment_in": int(bucket["segment_in"]),
             "avg_accessibility_fit": round(bucket["fit_sum"] / customers, 3) if customers else 0.0,
         }
+    unassigned["product_fit"] = product_fit
     return result, unassigned
 
 

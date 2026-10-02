@@ -19,7 +19,7 @@ PRICE_RESISTANCE_DOWNGRADE: dict[str, str] = {
     "Pause M10": "Master V7",
     "Master V7": "Master V6",
     "Master V6": "Master V5",
-    # Keep FDA Class 2 V-line — do not downgrade therapeutic SKUs into Pause M massage line.
+    # FDA Class II V-line stays on V until V5; S4 is furniture (Class I), not a therapeutic downgrade into Pause M.
     "Master V5": "Master S4",
     "Master S4": "Pause M4",
     "Pause M6": "Pause M4",
@@ -31,7 +31,7 @@ PRICE_RESISTANCE_DOWNGRADE: dict[str, str] = {
 HIGH_RESISTANCE_THRESHOLD = 0.65
 MODERATE_RESISTANCE_THRESHOLD = 0.45
 
-# Standing-promo FDA Class 2 SKUs — preserve in Mid-Low mass segments unless extreme resistance.
+# Standing-promo FDA Class II SKUs — preserve in Mid-Low mass segments unless extreme resistance.
 FDA_STANDING_PROMO_SKUS: frozenset[str] = frozenset({"Master V5", "Master V6"})
 
 

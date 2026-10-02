@@ -183,7 +183,7 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
       <WidgetShell
         fill
         title="Promotion Coverage"
-        subtitle="Conservative promo reach"
+        subtitle="Conservative reach · product-fit provisional is separate"
       >
         <div className="flex h-full min-h-0 flex-col gap-5">
           {coverageError ? (
@@ -203,6 +203,23 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
             if ((row.unreachable ?? 0) > 0) {
               convertParts.push(`${formatNumber(row.unreachable ?? 0)} unreachable`);
             }
+            if ((row.provisional_customers ?? 0) > 0) {
+              convertParts.push(`+${formatNumber(row.provisional_customers ?? 0)} product-fit provisional`);
+            }
+            if (row.product_fit?.v5_from_s4_pain) {
+              convertParts.push(`${formatNumber(row.product_fit.v5_from_s4_pain)} S4 Pain → V5 provisional`);
+            }
+            if (row.product_fit?.s4_furniture_unassigned) {
+              convertParts.push(`${formatNumber(row.product_fit.s4_furniture_unassigned)} furniture outreach`);
+            }
+            const familyLabel =
+              row.product_family === "fda_class_2"
+                ? "FDA Class II"
+                : row.product_family === "furniture_design"
+                  ? "Furniture · Class I"
+                  : row.product_family === "massage_sleep"
+                    ? "Massage / Sleep"
+                    : null;
             const isUnassigned = !row.product;
             return (
               <div key={row.product ?? "unassigned"} className="space-y-1">
@@ -215,6 +232,11 @@ export function CommercialIntelligencePanel({ data, uploadId }: Props) {
                     ) : (
                       <>
                         <span>{row.product}</span>
+                        {familyLabel ? (
+                          <span className="text-[10px] font-normal text-[var(--cios-secondary)]">
+                            {familyLabel}
+                          </span>
+                        ) : null}
                         <span className="text-[var(--cios-secondary)]">·</span>
                         <PromoCodeBadge code={row.promo_code} promoCodes={promoCodes} size="sm" />
                       </>

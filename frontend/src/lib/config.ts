@@ -178,27 +178,31 @@ export function sortProductsForLegend(products: string[]): string[] {
   });
 }
 
-/** Master V line (chart legend row 1). Master S4 is V-line value entry with SAVE30 promo. */
+/** FDA Class II 510(k) V line (ceragemus.com). Master S4 is furniture / Class I — not V Series. */
 export const V_SERIES_PRODUCTS = [
   "Master V9",
   "Master V7",
   "Master V6",
   "Master V5",
-  "Master S4",
 ] as const;
+
+/** Furniture / Healthterior — FDA Registered Class I Massage Lounger. */
+export const S_SERIES_PRODUCTS = ["Master S4"] as const;
 
 export const M_SERIES_PRODUCTS = ["Pause M10", "Pause M6", "Pause M6s", "Pause M4"] as const;
 
-export type ProductSeriesFilter = "all" | "v" | "m";
+export type ProductSeriesFilter = "all" | "v" | "s" | "m";
 
 export function productBelongsToSeries(product: string, series: ProductSeriesFilter): boolean {
   if (series === "all") return true;
-  if (series === "v") return product.startsWith("Master V") || product === "Master S4";
+  if (series === "v") return product.startsWith("Master V") && product !== "Master V4";
+  if (series === "s") return product === "Master S4" || product === "Pause S4" || product === "Master V4";
   return product.startsWith("Pause M");
 }
 
 export function productsForSeries(series: ProductSeriesFilter): readonly string[] {
   if (series === "v") return V_SERIES_PRODUCTS;
+  if (series === "s") return S_SERIES_PRODUCTS;
   if (series === "m") return M_SERIES_PRODUCTS;
   return PRODUCT_LEGEND_ORDER;
 }

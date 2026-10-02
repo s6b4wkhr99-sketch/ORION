@@ -10,7 +10,7 @@ export const CERAGEM_PRODUCT_LADDERS: Record<string, readonly string[]> = {
   "Mid-Low+ · Wellness": ["Pause M6s", "Pause M6", "Pause M4", "Master S4"],
   "Mid-Low+ · Pain Index": ["Master V5", "Master V6", "Master S4", "Pause M4"],
   "Low+ · Wellness": ["Master S4", "Pause M6s", "Pause M4", "Pause M10"],
-  "Low+ · Pain Index": ["Master S4", "Master V5", "Pause M4", "Master V6"],
+  "Low+ · Pain Index": ["Master V5", "Master S4", "Pause M4", "Master V6"],
 };
 
 export const PRIZM_PRODUCT_LADDERS: Record<string, readonly string[]> = {

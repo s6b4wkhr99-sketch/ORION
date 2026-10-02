@@ -35,7 +35,8 @@ PP_ACCESSIBILITY_AFFLUENT_MIN_PRICE = 9000
 V_POST_PROMO_LOW_PP_MAX_PRICE = 4200
 V_POST_PROMO_MID_PP_MAX_PRICE = 6500
 
-# Single V-line value entry SKU (Pause S4 legacy name → Master S4 via registry alias)
+# Furniture / design value-entry SKU (Pause S4 / Master V4 legacy names → Master S4).
+# Not FDA Class II — Ceragem US lists S4 as FDA Registered Class I Massage Lounger.
 V_VALUE_ENTRY_SKU = "Master S4"
 
 # Migration tone-down + sales-mix anchor (Recommendation B)

@@ -104,7 +104,7 @@ def build_recommendation_rationale(ctx: IntelligenceContext, rule_result: dict[s
             "label": "Pain Index",
             "level": ctx.pain_index_category or "Low",
             "score": _pct(ctx.pain_index),
-            "detail": "FDA Class 2 치료 니즈 — High일 때 V Series 우선",
+            "detail": "FDA Class II 치료 니즈 — High일 때 V Series 우선 (S4는 가구형)",
         },
         {
             "key": "lifestyle",

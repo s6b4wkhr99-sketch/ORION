@@ -237,6 +237,10 @@ def test_promotion_coverage_uses_post_promo_price_response():
     coverage = {row["product"]: row for row in summary["promotion_coverage"] if row.get("product")}
     unassigned = next((row for row in summary["promotion_coverage"] if not row.get("product")), None)
     assert coverage["Master V5"]["kpi_basis"] == "conservative_promo_reach"
+    assert coverage["Master V5"]["product_family"] == "fda_class_2"
+    assert coverage["Master V5"]["regulatory_class"] == "class_ii_510k"
+    assert coverage["Master S4"]["product_family"] == "furniture_design"
+    assert coverage["Master S4"]["regulatory_class"] == "class_i_registered"
     assert coverage["Master V5"]["customers"] == 110_000
     assert coverage["Master V5"]["direct"] == 10_000
     assert coverage["Master V5"]["down_convert"] == 100_000

@@ -123,7 +123,7 @@ export function CeragemDistributionWidget({
   useEffect(() => () => clearPopupTimers(), [clearPopupTimers]);
 
   const popupProducts = useMemo(() => {
-    if (!displaySegment?.products?.length) return { vSeries: [], mSeries: [] };
+    if (!displaySegment?.products?.length) return { vSeries: [], sSeries: [], mSeries: [] };
     return splitSegmentProductsBySeries(displaySegment.products);
   }, [displaySegment]);
 
@@ -183,14 +183,24 @@ export function CeragemDistributionWidget({
                 Customers: {formatNumber(displaySegment.count)} ({displaySegment.pct}%)
               </p>
               <p className="text-gray-700">TAR: {formatCurrency(displaySegment.revenue ?? 0)}</p>
-              {(popupProducts.vSeries.length > 0 || popupProducts.mSeries.length > 0) && (
+              {(popupProducts.vSeries.length > 0 || popupProducts.sSeries.length > 0 || popupProducts.mSeries.length > 0) && (
                 <div className="mt-2 space-y-2 border-t border-[var(--cios-border)] pt-2">
                   <p className="font-medium text-gray-900">Recommended Products</p>
                   {popupProducts.vSeries.length > 0 && (
                     <div>
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--cios-secondary)]">V Series</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--cios-secondary)]">V Series · FDA Class II</p>
                       <ul className="mt-0.5 space-y-0.5 text-gray-700">
                         {displayProductLegendLabels(popupProducts.vSeries).map((product) => (
+                          <li key={product}>{product}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {popupProducts.sSeries.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--cios-secondary)]">S Series · Furniture</p>
+                      <ul className="mt-0.5 space-y-0.5 text-gray-700">
+                        {displayProductLegendLabels(popupProducts.sSeries).map((product) => (
                           <li key={product}>{product}</li>
                         ))}
                       </ul>
