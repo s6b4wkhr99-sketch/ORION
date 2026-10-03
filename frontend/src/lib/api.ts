@@ -1111,6 +1111,8 @@ export type CommercialCatalogSaveResult = {
   errors?: string[];
 };
 
+export type AudienceExtractMode = "recommended" | "promo_reach";
+
 export type CampaignOpportunitySimulateRequest = {
   mainSku: string;
   additionalSkus?: string[];
@@ -1124,6 +1126,7 @@ export type CampaignOpportunitySimulateRequest = {
     brand_familiarity?: string[];
   };
   uploadId?: string;
+  audienceMode?: AudienceExtractMode;
 };
 
 export type CampaignOpportunityKpis = {
@@ -1136,6 +1139,7 @@ export type CampaignOpportunityKpis = {
 export type CampaignOpportunitySimulateResult = {
   skus: string[];
   main_sku: string;
+  audience_mode?: AudienceExtractMode;
   db_potential: CampaignOpportunityKpis;
   by_sku: Array<{ product: string; customers: number; revenue: number }>;
   phase1: {
@@ -1179,6 +1183,7 @@ export type AudienceExportCreateRequest = {
   predictedConversion: number;
   expectedOrders: number;
   geoScope: string;
+  audienceMode?: AudienceExtractMode;
 };
 
 export type AudienceExportRecommendation = {
@@ -1194,6 +1199,7 @@ export type AudienceExportRecommendation = {
   predictedConversion: number;
   expectedOrders: number;
   geoScope: string;
+  audienceMode?: AudienceExtractMode;
   createdAt?: string | null;
   createdBy?: string | null;
   downloadUrl?: string;

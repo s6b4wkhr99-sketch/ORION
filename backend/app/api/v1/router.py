@@ -743,6 +743,7 @@ class CampaignOpportunitySimulateRequest(BaseModel):
     states: list[str] = []
     segmentFilters: dict[str, list[str]] | None = None
     uploadId: str | None = None
+    audienceMode: str | None = None
 
 
 class AudienceExportCreateRequest(BaseModel):
@@ -752,6 +753,7 @@ class AudienceExportCreateRequest(BaseModel):
     states: list[str] = []
     segmentFilters: dict[str, list[str]] | None = None
     uploadId: str | None = None
+    audienceMode: str | None = None
     forecastCustomers: int
     forecastRevenue: float
     predictedConversion: float
@@ -775,6 +777,7 @@ def campaign_opportunity_simulate(
             additional_skus=body.additionalSkus,
             states=body.states,
             segment_filters=body.segmentFilters,
+            audience_mode=body.audienceMode,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail={"success": False, "message": str(e)}) from e
@@ -804,6 +807,7 @@ def audience_export_create(
             geo_scope=body.geoScope,
             name=body.name,
             created_by=user.get("email"),
+            audience_mode=body.audienceMode,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail={"success": False, "message": str(e)}) from e

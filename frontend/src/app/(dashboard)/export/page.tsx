@@ -81,7 +81,10 @@ export default function ExportPage() {
         render: (row) => (
           <div>
             <p className="font-medium text-gray-900">{row.name}</p>
-            <p className="mt-0.5 text-[10px] text-[var(--cios-secondary)]">{skuBundle(row)}</p>
+            <p className="mt-0.5 text-[10px] text-[var(--cios-secondary)]">
+              {row.audienceMode === "promo_reach" ? "Promo reach · " : "Recommended · "}
+              {skuBundle(row)}
+            </p>
           </div>
         ),
       },

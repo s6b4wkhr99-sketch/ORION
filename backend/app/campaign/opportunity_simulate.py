@@ -12,9 +12,13 @@ from sqlalchemy import case, func, literal, or_
 from sqlalchemy.orm import Session
 
 from app.campaign.sku_audience import (
+    AUDIENCE_MODE_PROMO_REACH,
     CAMPAIGN_SKU_FILTER_VERSION,
     apply_campaign_skus,
     confirmed_s4_pain_v5_clause,
+    load_live_coverage_groups,
+    normalize_audience_mode,
+    promo_reach_display_expr,
 )
 from app.config import settings
 from app.intelligence.ceragem_rules import parse_ceragem_tier
@@ -66,8 +70,23 @@ def _base_query(db: Session, upload_id: str | None):
     return q
 
 
-def _apply_skus(q, skus: list[str]):
-    return apply_campaign_skus(q, skus)
+def _apply_skus(
+    q,
+    skus: list[str],
+    *,
+    audience_mode: str | None = None,
+    db: Session | None = None,
+    upload_id: str | None = None,
+    coverage_groups: list[dict] | None = None,
+):
+    return apply_campaign_skus(
+        q,
+        skus,
+        audience_mode=audience_mode,
+        db=db,
+        upload_id=upload_id,
+        coverage_groups=coverage_groups,
+    )
 
 
 def _apply_states(q, states: list[str] | None):
@@ -266,7 +285,16 @@ def _segment_distributions(q) -> dict:
     }
 
 
-def _top_metros(db: Session, upload_id: str | None, states: list[str] | None, skus: list[str], limit: int = 5) -> list[dict]:
+def _top_metros(
+    db: Session,
+    upload_id: str | None,
+    states: list[str] | None,
+    skus: list[str],
+    limit: int = 5,
+    *,
+    audience_mode: str | None = None,
+    coverage_groups: list[dict] | None = None,
+) -> list[dict]:
     from app.campaign.dashboards import get_metro_intelligence_dashboard
 
     payload = get_metro_intelligence_dashboard(db, upload_id, None)
@@ -277,7 +305,14 @@ def _top_metros(db: Session, upload_id: str | None, states: list[str] | None, sk
 
     sku_ratio = 1.0
     if skus:
-        db_q = _apply_skus(_base_query(db, upload_id), skus)
+        db_q = _apply_skus(
+            _base_query(db, upload_id),
+            skus,
+            audience_mode=audience_mode,
+            db=db,
+            upload_id=upload_id,
+            coverage_groups=coverage_groups,
+        )
         all_customers = int(db_q.with_entities(func.count(Customer.customer_id)).scalar() or 0)
         total_customers = int(_base_query(db, upload_id).with_entities(func.count(Customer.customer_id)).scalar() or 1)
         sku_ratio = all_customers / total_customers if total_customers else 1.0
@@ -312,6 +347,7 @@ def _simulate_cache_key(
     additional_skus: list[str] | None,
     states: list[str] | None,
     segment_filters: dict | None,
+    audience_mode: str | None = None,
 ) -> str:
     payload = {
         "version": CAMPAIGN_SKU_FILTER_VERSION,
@@ -320,6 +356,7 @@ def _simulate_cache_key(
         "additional_skus": sorted(additional_skus or []),
         "states": sorted(states or []),
         "segment_filters": segment_filters or {},
+        "audience_mode": normalize_audience_mode(audience_mode),
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True, default=str).encode()).hexdigest()
 
@@ -332,6 +369,7 @@ def _run_simulation(
     additional_skus: list[str] | None = None,
     states: list[str] | None = None,
     segment_filters: dict | None = None,
+    audience_mode: str | None = None,
 ) -> dict:
     skus = []
     if main_sku:
@@ -343,15 +381,27 @@ def _run_simulation(
     if not skus:
         raise ValueError("main_sku is required")
 
+    mode = normalize_audience_mode(audience_mode)
+    groups = load_live_coverage_groups(db, upload_id) if mode == AUDIENCE_MODE_PROMO_REACH else None
     base = _base_query(db, upload_id)
-    db_scope = _apply_skus(base, skus)
+    db_scope = _apply_skus(
+        base,
+        skus,
+        audience_mode=mode,
+        db=db,
+        upload_id=upload_id,
+        coverage_groups=groups,
+    )
     phase1 = _apply_states(db_scope, states)
     phase2 = _apply_segment_filters(phase1, segment_filters)
 
-    display_product = case(
-        (confirmed_s4_pain_v5_clause(), literal("Master V5")),
-        else_=CustomerIntelligence.recommended_product,
-    )
+    if mode == AUDIENCE_MODE_PROMO_REACH and groups is not None:
+        display_product = promo_reach_display_expr(skus, groups)
+    else:
+        display_product = case(
+            (confirmed_s4_pain_v5_clause(), literal("Master V5")),
+            else_=CustomerIntelligence.recommended_product,
+        )
     by_sku = (
         db_scope.with_entities(
             display_product,
@@ -365,6 +415,7 @@ def _run_simulation(
     return {
         "skus": skus,
         "main_sku": main_sku,
+        "audience_mode": mode,
         "db_potential": _aggregate_kpis(db_scope),
         "by_sku": [
             {
@@ -378,7 +429,15 @@ def _run_simulation(
             "kpis": _aggregate_kpis(phase1),
             "by_state": _by_state(phase1),
             "sku_by_state": _by_state(db_scope),
-            "top_metros": _top_metros(db, upload_id, states, skus, limit=5),
+            "top_metros": _top_metros(
+                db,
+                upload_id,
+                states,
+                skus,
+                limit=5,
+                audience_mode=mode,
+                coverage_groups=groups,
+            ),
         },
         "phase2": {
             "kpis": _aggregate_kpis(phase2),
@@ -396,7 +455,9 @@ def simulate_email_campaign_opportunity(
     additional_skus: list[str] | None = None,
     states: list[str] | None = None,
     segment_filters: dict | None = None,
+    audience_mode: str | None = None,
 ) -> dict:
+    mode = normalize_audience_mode(audience_mode)
     if not settings.opportunity_simulate_cache_enabled:
         return _run_simulation(
             db,
@@ -405,6 +466,7 @@ def simulate_email_campaign_opportunity(
             additional_skus=additional_skus,
             states=states,
             segment_filters=segment_filters,
+            audience_mode=mode,
         )
 
     cache_key = _simulate_cache_key(
@@ -413,6 +475,7 @@ def simulate_email_campaign_opportunity(
         additional_skus=additional_skus,
         states=states,
         segment_filters=segment_filters,
+        audience_mode=mode,
     )
     now = time.time()
     ttl = max(30, int(settings.opportunity_simulate_cache_ttl_seconds))
@@ -429,6 +492,7 @@ def simulate_email_campaign_opportunity(
         additional_skus=additional_skus,
         states=states,
         segment_filters=segment_filters,
+        audience_mode=mode,
     )
 
     with _SIMULATE_CACHE_LOCK:

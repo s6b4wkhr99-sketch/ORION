@@ -1,5 +1,6 @@
 "use client";
 
+import type { AudienceExtractMode } from "@/lib/api";
 import { PRODUCT_OPTIONS } from "@/lib/config";
 import { promoStyleForCode, uniquePromoCodes } from "@/lib/promo-chip-styles";
 import type { StandingPromotionRow } from "@/lib/standing-promotions";
@@ -8,8 +9,10 @@ import { cn } from "@/lib/utils";
 type PrimeSkuSelectorProps = {
   mainSku: string;
   additionalSkus: string[];
+  audienceMode?: AudienceExtractMode;
   onMainChange: (sku: string) => void;
   onAdditionalChange: (skus: string[]) => void;
+  onAudienceModeChange?: (mode: AudienceExtractMode) => void;
   bySku?: Array<{ product: string; customers: number; revenue: number }>;
   activePromotions?: StandingPromotionRow[];
 };
@@ -17,8 +20,10 @@ type PrimeSkuSelectorProps = {
 export function PrimeSkuSelector({
   mainSku,
   additionalSkus,
+  audienceMode,
   onMainChange,
   onAdditionalChange,
+  onAudienceModeChange,
   bySku,
   activePromotions = [],
 }: PrimeSkuSelectorProps) {
@@ -39,7 +44,41 @@ export function PrimeSkuSelector({
       <h2 className="text-base font-semibold text-gray-900">Prime SKU Selection</h2>
       <p className="mt-1 text-xs text-[var(--cios-secondary)]">
         Email campaigns require one Main SKU. Add supporting SKUs to evaluate combined DB potential.
+        {onAudienceModeChange ? " Choose Recommended or Promo reach before extracting." : ""}
       </p>
+
+      {onAudienceModeChange ? (
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--cios-secondary)]">Extract mode</p>
+          <div className="inline-flex rounded-full border border-[var(--cios-border)] bg-white p-0.5">
+            <button
+              type="button"
+              onClick={() => onAudienceModeChange("recommended")}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium",
+                audienceMode === "recommended" ? "bg-indigo-600 text-white" : "text-gray-600 hover:text-gray-900",
+              )}
+            >
+              Recommended
+            </button>
+            <button
+              type="button"
+              onClick={() => onAudienceModeChange("promo_reach")}
+              className={cn(
+                "rounded-full px-3 py-1.5 text-xs font-medium",
+                audienceMode === "promo_reach" ? "bg-indigo-600 text-white" : "text-gray-600 hover:text-gray-900",
+              )}
+            >
+              Promo reach
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-[var(--cios-secondary)]">
+            {audienceMode === "promo_reach"
+              ? "Promo reach uses Mission Control Coverage: the selected standing promo, including down-converts."
+              : "Recommended uses assigned product only. V5 still includes confirmed S4 Pain targets."}
+          </p>
+        </div>
+      ) : null}
 
       {activePromotions.length ? (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-[10px] text-[var(--cios-secondary)]">

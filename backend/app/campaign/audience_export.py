@@ -19,6 +19,7 @@ from app.campaign.opportunity_simulate import (
     _apply_states,
     _base_query,
 )
+from app.campaign.sku_audience import audience_mode_label, normalize_audience_mode
 from app.config import settings
 from app.models.export import AudienceExportRecommendation
 from app.models.customer import Customer, CustomerIntelligence
@@ -38,12 +39,12 @@ def _serialize_skus(main_sku: str, additional_skus: list[str] | None) -> list[st
     return skus
 
 
-def _default_name(main_sku: str, geo_scope: str) -> str:
+def _default_name(main_sku: str, geo_scope: str, audience_mode: str | None = None) -> str:
     stamp = now_app().strftime("%b %d, %Y %H:%M")
     scope = geo_scope if geo_scope and geo_scope != "National" else "National"
     if len(scope) > 48:
         scope = f"{scope[:45]}..."
-    return f"Opportunity · {main_sku} · {scope} · {stamp}"
+    return f"Opportunity · {audience_mode_label(audience_mode)} · {main_sku} · {scope} · {stamp}"
 
 
 def _audience_query(db: Session, rec: AudienceExportRecommendation):
@@ -55,7 +56,13 @@ def _audience_query(db: Session, rec: AudienceExportRecommendation):
     upload_id = str(rec.upload_id) if rec.upload_id else None
 
     q = _base_query(db, upload_id)
-    q = _apply_skus(q, skus)
+    q = _apply_skus(
+        q,
+        skus,
+        audience_mode=getattr(rec, "audience_mode", None),
+        db=db,
+        upload_id=upload_id,
+    )
     q = _apply_states(q, states or None)
     q = _apply_segment_filters(q, segment_filters)
     return q
@@ -75,6 +82,7 @@ def _row_payload(rec: AudienceExportRecommendation) -> dict:
         "predictedConversion": rec.predicted_conversion,
         "expectedOrders": rec.expected_orders,
         "geoScope": rec.geo_scope,
+        "audienceMode": normalize_audience_mode(getattr(rec, "audience_mode", None)),
         "createdAt": rec.created_at.isoformat() if rec.created_at else None,
         "createdBy": rec.created_by,
         "downloadUrl": f"/api/v1/audience-exports/{rec.recommendation_id}/download",
@@ -96,6 +104,7 @@ def create_audience_export(
     geo_scope: str,
     name: str | None = None,
     created_by: str | None = None,
+    audience_mode: str | None = None,
 ) -> dict:
     if not main_sku or not main_sku.strip():
         raise ValueError("main_sku is required")
@@ -104,9 +113,10 @@ def create_audience_export(
     state_list = [s.strip().upper() for s in (states or []) if s and s.strip()]
     geo = geo_scope.strip() if geo_scope and geo_scope.strip() else ("National" if not state_list else ", ".join(state_list))
     uid = uuid.UUID(upload_id) if upload_id else None
+    mode = normalize_audience_mode(audience_mode)
 
     rec = AudienceExportRecommendation(
-        name=(name or _default_name(main_sku.strip(), geo)).strip(),
+        name=(name or _default_name(main_sku.strip(), geo, mode)).strip(),
         main_sku=main_sku.strip(),
         additional_skus_json=json.dumps([sku for sku in skus if sku != main_sku.strip()]),
         states_json=json.dumps(state_list),
@@ -117,6 +127,7 @@ def create_audience_export(
         predicted_conversion=round(float(predicted_conversion or 0), 6),
         expected_orders=round(float(expected_orders or 0), 2),
         geo_scope=geo,
+        audience_mode=mode,
         created_by=created_by,
     )
     db.add(rec)

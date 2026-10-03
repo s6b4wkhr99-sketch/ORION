@@ -53,5 +53,6 @@ class AudienceExportRecommendation(Base):
     predicted_conversion: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     expected_orders: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     geo_scope: Mapped[str] = mapped_column(String(512), nullable=False, default="National")
+    audience_mode: Mapped[str] = mapped_column(String(32), nullable=False, default="recommended")
     created_by: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

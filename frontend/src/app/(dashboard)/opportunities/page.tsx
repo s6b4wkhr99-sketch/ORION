@@ -16,7 +16,7 @@ import { UsChoroplethMap } from "@/components/dashboard/us-choropleth-map";
 import { PageSkeleton } from "@/components/ui/skeleton";
 import { US_STATE_ABBRS } from "@/data/us-state-names";
 import { useFilters } from "@/contexts/filter-context";
-import { api, type CampaignOpportunitySimulateResult } from "@/lib/api";
+import { api, type AudienceExtractMode, type CampaignOpportunitySimulateResult } from "@/lib/api";
 import { PRODUCT_OPTIONS } from "@/lib/config";
 import { normalizeActivePromotions, type StandingPromotionRow } from "@/lib/standing-promotions";
 import { formatCurrency, formatNumber, formatPercent } from "@/lib/utils";
@@ -28,6 +28,7 @@ export default function OpportunitiesPage() {
   const { selectedUploadId } = useFilters();
   const [mainSku, setMainSku] = useState<string>(PRODUCT_OPTIONS[2] ?? "Master V6");
   const [additionalSkus, setAdditionalSkus] = useState<string[]>([]);
+  const [audienceMode, setAudienceMode] = useState<AudienceExtractMode>("recommended");
   const [selectedStates, setSelectedStates] = useState<string[]>([]);
   const [segmentFilters, setSegmentFilters] = useState<SegmentFilterState>(emptySegmentFilters());
   const [result, setResult] = useState<CampaignOpportunitySimulateResult | null>(null);
@@ -53,6 +54,7 @@ export default function OpportunitiesPage() {
         states: selectedStates,
         segmentFilters: hasSegmentFilters ? segmentFilters : undefined,
         uploadId: selectedUploadId ?? undefined,
+        audienceMode,
       });
       setResult(payload);
     } catch (err) {
@@ -61,7 +63,7 @@ export default function OpportunitiesPage() {
       setSimulating(false);
       setLoading(false);
     }
-  }, [mainSku, additionalSkus, selectedStates, segmentFilters, hasSegmentFilters, selectedUploadId]);
+  }, [mainSku, additionalSkus, audienceMode, selectedStates, segmentFilters, hasSegmentFilters, selectedUploadId]);
 
   useEffect(() => {
     api
@@ -115,6 +117,7 @@ export default function OpportunitiesPage() {
         states: selectedStates,
         segmentFilters: hasSegmentFilters ? segmentFilters : undefined,
         uploadId: selectedUploadId ?? undefined,
+        audienceMode,
         forecastCustomers: activeKpis.customers,
         forecastRevenue: activeKpis.revenue,
         predictedConversion: activeKpis.conversion,
@@ -133,6 +136,7 @@ export default function OpportunitiesPage() {
     mainSku,
     activeKpis,
     additionalSkus,
+    audienceMode,
     selectedStates,
     hasSegmentFilters,
     segmentFilters,
@@ -153,8 +157,8 @@ export default function OpportunitiesPage() {
           {simulating ? <Loader2 className="h-4 w-4 animate-spin text-indigo-500" aria-label="Simulating" /> : null}
         </div>
         <p className="mt-1 text-sm text-[var(--cios-secondary)]">
-          Email campaign KPI simulator — select a Main SKU plus add-ons, evaluate full DB potential, multi-select states,
-          analyze Top 5 metros, then refine with segment donuts.
+          Email campaign KPI simulator — select Recommended or Promo reach, then a Main SKU plus add-ons, evaluate full
+          DB potential, multi-select states, analyze Top 5 metros, then refine with segment donuts.
         </p>
       </header>
 
@@ -165,8 +169,10 @@ export default function OpportunitiesPage() {
       <PrimeSkuSelector
         mainSku={mainSku}
         additionalSkus={additionalSkus}
+        audienceMode={audienceMode}
         onMainChange={setMainSku}
         onAdditionalChange={setAdditionalSkus}
+        onAudienceModeChange={setAudienceMode}
         bySku={result?.by_sku}
         activePromotions={activePromotions}
       />

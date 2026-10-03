@@ -342,6 +342,66 @@ def is_confirmed_s4_pain_v5_target(
     )
 
 
+@dataclass(frozen=True)
+class CoverageAssignment:
+    outreach_sku: str | None
+    bucket: str
+    accessibility_fit: float = 0.0
+    blocked_outreach_sku: str | None = None
+
+
+def assign_conservative_coverage(
+    primary_sku: str,
+    *,
+    purchase_power_category: str | None = None,
+    zip_income_tier: str | None = None,
+    ceragem_segment: str | None = None,
+) -> CoverageAssignment:
+    """One standing-promo SKU per cohort, or unassigned. Same rule as Promotion Coverage."""
+    standing = set(standing_promo_product_order())
+    primary = normalize_product_code(primary_sku)
+    if not primary:
+        return CoverageAssignment(None, "unreachable")
+    pp = purchase_power_category
+    zip_tier = zip_income_tier
+    segment = ceragem_segment
+
+    if (
+        "Pause M10" in standing
+        and is_promotion_active("Pause M10")
+        and eligible_m10_segment_coverage(primary, purchase_power_category=pp, ceragem_segment=segment)
+        and is_post_promo_accessible("Pause M10", purchase_power_category=pp, zip_income_tier=zip_tier)
+    ):
+        pp_score = purchase_power_score(pp, zip_tier or zip_income_tier_from_pp_category(pp))
+        return CoverageAssignment("Pause M10", "segment_in", accessibility_fit("Pause M10", pp_score))
+
+    response = resolve_promo_price_response(
+        primary,
+        purchase_power_category=pp,
+        zip_income_tier=zip_tier,
+        ceragem_segment=segment,
+    )
+    outreach = normalize_product_code(response.outreach_sku)
+
+    if response.direction in {PromoPriceDirection.UP, PromoPriceDirection.DOWN}:
+        if is_post_promo_accessible(primary, purchase_power_category=pp, zip_income_tier=zip_tier):
+            if not is_confirmed_s4_pain_v5_target(primary, outreach, response.direction):
+                return CoverageAssignment(None, "afford_own", blocked_outreach_sku=outreach)
+
+    if response.direction == PromoPriceDirection.UNREACHABLE or outreach not in standing:
+        return CoverageAssignment(None, "unreachable")
+
+    if response.direction == PromoPriceDirection.UP:
+        bucket = "up_convert"
+    elif response.direction == PromoPriceDirection.DOWN:
+        bucket = "down_convert"
+    elif response.primary_sku == outreach:
+        bucket = "direct"
+    else:
+        bucket = "direct"
+    return CoverageAssignment(outreach, bucket, response.accessibility_fit)
+
+
 def aggregate_conservative_promo_coverage(
     cohort_rows: list[dict],
 ) -> tuple[dict[str, dict[str, int | float]], dict[str, int]]:
@@ -354,7 +414,6 @@ def aggregate_conservative_promo_coverage(
     - Confirmed exception: S4 Pain up-convert to V5 counts as V5 reach even if S4 is affordable.
     - Remaining cohorts (afford own tier, unreachable, non-standing outreach) → unassigned.
     """
-    standing = set(standing_promo_product_order())
     totals: dict[str, dict[str, float]] = defaultdict(
         lambda: {
             "customers": 0.0,
@@ -373,60 +432,25 @@ def aggregate_conservative_promo_coverage(
         customers = int(row.get("customers") or 0)
         if not primary or customers <= 0:
             continue
-        pp = row.get("purchase_power_category")
-        zip_tier = row.get("zip_income_tier")
-        segment = row.get("ceragem_segment")
-
-        if (
-            "Pause M10" in standing
-            and is_promotion_active("Pause M10")
-            and eligible_m10_segment_coverage(primary, purchase_power_category=pp, ceragem_segment=segment)
-            and is_post_promo_accessible("Pause M10", purchase_power_category=pp, zip_income_tier=zip_tier)
-        ):
-            bucket = totals["Pause M10"]
-            bucket["customers"] += customers
-            bucket["segment_in"] += customers
-            pp_score = purchase_power_score(pp, zip_tier or zip_income_tier_from_pp_category(pp))
-            bucket["fit_sum"] += customers * accessibility_fit("Pause M10", pp_score)
-            continue
-
-        response = resolve_promo_price_response(
+        assignment = assign_conservative_coverage(
             primary,
-            purchase_power_category=pp,
-            zip_income_tier=zip_tier,
-            ceragem_segment=segment,
+            purchase_power_category=row.get("purchase_power_category"),
+            zip_income_tier=row.get("zip_income_tier"),
+            ceragem_segment=row.get("ceragem_segment"),
         )
-        outreach = normalize_product_code(response.outreach_sku)
-
-        if response.direction in {PromoPriceDirection.UP, PromoPriceDirection.DOWN}:
-            if is_post_promo_accessible(
-                primary,
-                purchase_power_category=pp,
-                zip_income_tier=zip_tier,
-            ):
-                if is_confirmed_s4_pain_v5_target(primary, outreach, response.direction):
-                    pass
-                else:
-                    unassigned["customers"] += customers
-                    unassigned["afford_own"] += customers
-                    if outreach == "Master S4":
-                        product_fit["s4_furniture_unassigned"] += customers
-                    continue
-
-        if response.direction == PromoPriceDirection.UNREACHABLE or outreach not in standing:
+        if assignment.outreach_sku is None:
             unassigned["customers"] += customers
-            unassigned["unreachable"] += customers
+            if assignment.bucket in unassigned:
+                unassigned[assignment.bucket] += customers
+            if assignment.bucket == "afford_own" and assignment.blocked_outreach_sku == "Master S4":
+                product_fit["s4_furniture_unassigned"] += customers
             continue
 
-        bucket = totals[outreach]
+        bucket = totals[assignment.outreach_sku]
         bucket["customers"] += customers
-        bucket["fit_sum"] += customers * response.accessibility_fit
-        if response.direction == PromoPriceDirection.UP:
-            bucket["up_convert"] += customers
-        elif response.direction == PromoPriceDirection.DOWN:
-            bucket["down_convert"] += customers
-        elif response.primary_sku == outreach:
-            bucket["direct"] += customers
+        bucket["fit_sum"] += customers * assignment.accessibility_fit
+        if assignment.bucket in bucket:
+            bucket[assignment.bucket] += customers
 
     result: dict[str, dict[str, int | float]] = {}
     for product, bucket in totals.items():

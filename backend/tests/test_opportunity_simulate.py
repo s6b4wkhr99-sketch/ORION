@@ -298,3 +298,57 @@ def test_simulate_v5_includes_s4_pain_low_pp_targets(db):
     assert v5["db_potential"]["customers"] == 2
     assert {row["product"] for row in v5["by_sku"]} == {"Master V5"}
     assert s4["db_potential"]["customers"] == 1
+
+
+def test_simulate_promo_reach_includes_v6_down_convert_not_afford_own(db):
+    session, created = db
+    upload = _seed_bundle(session, created)
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V6",
+        ceragem="Mid-High+ · Wellness",
+        prizm="Affluent",
+        lifestyle=0.8,
+        pain=0.3,
+        brand=0.6,
+        purchase_power=0.5,
+    )
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V9",
+        ceragem="High+ · Wellness",
+        prizm="Affluent",
+        lifestyle=0.9,
+        pain=0.2,
+        brand=0.7,
+        purchase_power=0.5,
+    )
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V7",
+        ceragem="Mid-High+ · Wellness",
+        prizm="Affluent",
+        lifestyle=0.8,
+        pain=0.2,
+        brand=0.6,
+        purchase_power=0.5,
+    )
+
+    recommended = simulate_email_campaign_opportunity(
+        session, str(upload.upload_id), main_sku="Master V6", audience_mode="recommended"
+    )
+    promo_reach = simulate_email_campaign_opportunity(
+        session, str(upload.upload_id), main_sku="Master V6", audience_mode="promo_reach"
+    )
+
+    assert recommended["audience_mode"] == "recommended"
+    assert recommended["db_potential"]["customers"] == 1
+    assert promo_reach["audience_mode"] == "promo_reach"
+    assert promo_reach["db_potential"]["customers"] == 2
+    assert {row["product"] for row in promo_reach["by_sku"]} == {"Master V6"}
