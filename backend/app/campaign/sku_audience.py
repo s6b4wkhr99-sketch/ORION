@@ -9,11 +9,11 @@ from sqlalchemy.orm import Session
 
 from app.intelligence.promo_price_response import assign_conservative_coverage
 from app.models.customer import Customer, CustomerIntelligence
-from app.reference.registry import normalize_product_code
+from app.reference.registry import PRODUCT_GROSS_SALES, normalize_product_code
 
 S4_PRODUCT_ALIASES = ("Master S4", "Pause S4", "Master V4")
 LOW_PP_INDEX_MAX = 0.34
-CAMPAIGN_SKU_FILTER_VERSION = "v5-s4-pain-promo-reach-v1"
+CAMPAIGN_SKU_FILTER_VERSION = "v5-s4-pain-promo-reach-rev-v2"
 AUDIENCE_MODE_RECOMMENDED = "recommended"
 AUDIENCE_MODE_PROMO_REACH = "promo_reach"
 
@@ -27,6 +27,37 @@ def normalize_audience_mode(mode: str | None) -> str:
 
 def audience_mode_label(mode: str | None) -> str:
     return "Promo reach" if normalize_audience_mode(mode) == AUDIENCE_MODE_PROMO_REACH else "Recommended"
+
+
+def customer_payment_map() -> dict[str, float]:
+    """Gross if no promo, customer payment if a standing promo is active."""
+    from app.commercial.engine import effective_customer_payment
+
+    prices: dict[str, float] = {}
+    for code in PRODUCT_GROSS_SALES:
+        normalized = normalize_product_code(code)
+        if not normalized:
+            continue
+        prices[normalized] = float(effective_customer_payment(normalized))
+    s4 = prices.get("Master S4", 0.0)
+    for alias in S4_PRODUCT_ALIASES:
+        prices[alias] = s4
+    return prices
+
+
+def customer_payment_expr(product_expr):
+    whens = [
+        (product_expr == code, literal(price))
+        for code, price in customer_payment_map().items()
+        if price > 0
+    ]
+    if not whens:
+        return literal(0.0)
+    return case(*whens, else_=literal(0.0))
+
+
+def priced_revenue_expr(product_expr):
+    return func.coalesce(CustomerIntelligence.expected_conversion, 0.0) * customer_payment_expr(product_expr)
 
 
 def confirmed_s4_pain_v5_clause():

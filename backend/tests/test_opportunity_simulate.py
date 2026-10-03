@@ -352,3 +352,107 @@ def test_simulate_promo_reach_includes_v6_down_convert_not_afford_own(db):
     assert promo_reach["audience_mode"] == "promo_reach"
     assert promo_reach["db_potential"]["customers"] == 2
     assert {row["product"] for row in promo_reach["by_sku"]} == {"Master V6"}
+
+
+def _priced(product: str, customers: int = 1, conversion: float = 0.25) -> float:
+    from app.commercial.engine import effective_customer_payment
+
+    return round(customers * conversion * effective_customer_payment(product), 2)
+
+
+def test_simulate_revenue_uses_customer_payment_not_stored_gross(db):
+    session, created = db
+    upload = _seed_bundle(session, created)
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V6",
+        ceragem="Mid-High+ · Wellness",
+        prizm="Affluent",
+        lifestyle=0.8,
+        pain=0.3,
+        brand=0.6,
+        purchase_power=0.5,
+    )
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V9",
+        ceragem="High+ · Wellness",
+        prizm="Affluent",
+        lifestyle=0.9,
+        pain=0.2,
+        brand=0.7,
+        purchase_power=0.9,
+    )
+
+    v6 = simulate_email_campaign_opportunity(session, str(upload.upload_id), main_sku="Master V6")
+    v9 = simulate_email_campaign_opportunity(session, str(upload.upload_id), main_sku="Master V9")
+
+    assert v6["db_potential"]["revenue"] == _priced("Master V6")
+    assert v6["db_potential"]["revenue"] != 1000.0
+    assert v9["db_potential"]["revenue"] == _priced("Master V9")
+    assert v9["by_sku"][0]["revenue"] == _priced("Master V9")
+
+
+def test_simulate_promo_reach_revenue_uses_outreach_sku_payment(db):
+    session, created = db
+    upload = _seed_bundle(session, created)
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V6",
+        ceragem="Mid-High+ · Wellness",
+        prizm="Affluent",
+        lifestyle=0.8,
+        pain=0.3,
+        brand=0.6,
+        purchase_power=0.5,
+    )
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master V9",
+        ceragem="High+ · Wellness",
+        prizm="Affluent",
+        lifestyle=0.9,
+        pain=0.2,
+        brand=0.7,
+        purchase_power=0.5,
+    )
+
+    result = simulate_email_campaign_opportunity(
+        session, str(upload.upload_id), main_sku="Master V6", audience_mode="promo_reach"
+    )
+
+    assert result["db_potential"]["customers"] == 2
+    assert result["db_potential"]["revenue"] == _priced("Master V6", customers=2)
+    assert result["by_sku"][0]["product"] == "Master V6"
+    assert result["by_sku"][0]["revenue"] == _priced("Master V6", customers=2)
+
+
+def test_simulate_v5_s4_pain_revenue_uses_v5_payment(db):
+    session, created = db
+    upload = _seed_bundle(session, created)
+    _seed_customer(
+        session,
+        upload,
+        state="CA",
+        product="Master S4",
+        ceragem="Low+ · Pain Index",
+        prizm="Caregiving Households",
+        lifestyle=0.4,
+        pain=0.7,
+        brand=0.4,
+        purchase_power=0.25,
+    )
+
+    result = simulate_email_campaign_opportunity(session, str(upload.upload_id), main_sku="Master V5")
+
+    assert result["db_potential"]["customers"] == 1
+    assert result["db_potential"]["revenue"] == _priced("Master V5")
+    assert result["by_sku"][0]["product"] == "Master V5"

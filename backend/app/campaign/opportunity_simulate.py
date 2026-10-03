@@ -18,6 +18,7 @@ from app.campaign.sku_audience import (
     confirmed_s4_pain_v5_clause,
     load_live_coverage_groups,
     normalize_audience_mode,
+    priced_revenue_expr,
     promo_reach_display_expr,
 )
 from app.config import settings
@@ -184,11 +185,12 @@ def _apply_segment_filters(q, filters: dict | None):
     return q
 
 
-def _aggregate_kpis(q) -> dict:
+def _aggregate_kpis(q, product_expr=None) -> dict:
+    revenue_expr = priced_revenue_expr(product_expr) if product_expr is not None else CustomerIntelligence.expected_revenue
     customers, revenue, conversion_sum = (
         q.with_entities(
             func.count(Customer.customer_id),
-            func.coalesce(func.sum(CustomerIntelligence.expected_revenue), 0.0),
+            func.coalesce(func.sum(revenue_expr), 0.0),
             func.coalesce(func.sum(CustomerIntelligence.expected_conversion), 0.0),
         ).one()
     )
@@ -204,12 +206,13 @@ def _aggregate_kpis(q) -> dict:
     }
 
 
-def _by_state(q) -> list[dict]:
+def _by_state(q, product_expr=None) -> list[dict]:
+    revenue_expr = priced_revenue_expr(product_expr) if product_expr is not None else CustomerIntelligence.expected_revenue
     rows = (
         q.with_entities(
             Customer.state,
             func.count(Customer.customer_id),
-            func.coalesce(func.sum(CustomerIntelligence.expected_revenue), 0.0),
+            func.coalesce(func.sum(revenue_expr), 0.0),
             func.coalesce(func.sum(CustomerIntelligence.expected_conversion), 0.0),
         )
         .group_by(Customer.state)
@@ -294,6 +297,7 @@ def _top_metros(
     *,
     audience_mode: str | None = None,
     coverage_groups: list[dict] | None = None,
+    product_expr=None,
 ) -> list[dict]:
     from app.campaign.dashboards import get_metro_intelligence_dashboard
 
@@ -304,6 +308,7 @@ def _top_metros(
         metros = [m for m in metros if state_set.intersection(set(m.get("states") or []))]
 
     sku_ratio = 1.0
+    revenue_per_customer = 0.0
     if skus:
         db_q = _apply_skus(
             _base_query(db, upload_id),
@@ -316,11 +321,19 @@ def _top_metros(
         all_customers = int(db_q.with_entities(func.count(Customer.customer_id)).scalar() or 0)
         total_customers = int(_base_query(db, upload_id).with_entities(func.count(Customer.customer_id)).scalar() or 1)
         sku_ratio = all_customers / total_customers if total_customers else 1.0
+        if product_expr is not None and all_customers:
+            priced = float(
+                db_q.with_entities(func.coalesce(func.sum(priced_revenue_expr(product_expr)), 0.0)).scalar() or 0
+            )
+            revenue_per_customer = priced / all_customers
 
     ranked = []
     for metro in metros:
         customers = int(round((metro.get("target_customers") or 0) * sku_ratio))
-        revenue = round(float(metro.get("expected_revenue") or 0) * sku_ratio, 2)
+        if revenue_per_customer:
+            revenue = round(customers * revenue_per_customer, 2)
+        else:
+            revenue = round(float(metro.get("expected_revenue") or 0) * sku_ratio, 2)
         if customers <= 0:
             continue
         ranked.append(
@@ -406,7 +419,7 @@ def _run_simulation(
         db_scope.with_entities(
             display_product,
             func.count(Customer.customer_id),
-            func.coalesce(func.sum(CustomerIntelligence.expected_revenue), 0.0),
+            func.coalesce(func.sum(priced_revenue_expr(display_product)), 0.0),
         )
         .group_by(display_product)
         .all()
@@ -416,7 +429,7 @@ def _run_simulation(
         "skus": skus,
         "main_sku": main_sku,
         "audience_mode": mode,
-        "db_potential": _aggregate_kpis(db_scope),
+        "db_potential": _aggregate_kpis(db_scope, display_product),
         "by_sku": [
             {
                 "product": product,
@@ -426,9 +439,9 @@ def _run_simulation(
             for product, customers, revenue in by_sku
         ],
         "phase1": {
-            "kpis": _aggregate_kpis(phase1),
-            "by_state": _by_state(phase1),
-            "sku_by_state": _by_state(db_scope),
+            "kpis": _aggregate_kpis(phase1, display_product),
+            "by_state": _by_state(phase1, display_product),
+            "sku_by_state": _by_state(db_scope, display_product),
             "top_metros": _top_metros(
                 db,
                 upload_id,
@@ -437,10 +450,11 @@ def _run_simulation(
                 limit=5,
                 audience_mode=mode,
                 coverage_groups=groups,
+                product_expr=display_product,
             ),
         },
         "phase2": {
-            "kpis": _aggregate_kpis(phase2),
+            "kpis": _aggregate_kpis(phase2, display_product),
             # Keep segment distributions on Phase 1 scope so legend/chart layout stays stable while KPIs refine.
             "segment_distributions": _segment_distributions(phase1),
         },
